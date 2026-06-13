@@ -69,15 +69,14 @@
                 .catch(err => showCustomAlert("系統連線失敗，請重開 LINE 再試。"));
         };
 
-        // 🧠 全自動雲端密碼初始化函數：新分店預設為 0000 與 0000000
         async function autoInitializeCloudPassword() {
             try {
                 const configDocRef = doc(db, "system_config", "admin_settings");
                 const configSnap = await getDoc(configDocRef);
                 if (!configSnap.exists()) {
                     await setDoc(configDocRef, {
-                        staffPassword: "0000",       // 👈 預設新店的店家密碼改為 0000
-                        bossPassword: "0000000",     // 👈 預設新店的高階密碼改為 0000000
+                        staffPassword: "0000",       
+                        bossPassword: "0000000",     
                         initializedAt: new Date().toISOString()
                     });
                 } else {
@@ -197,7 +196,7 @@
             try {
                 const configDocRef = doc(db, "system_config", "admin_settings");
                 const configSnap = await getDoc(configDocRef);
-                let cloudBossPassword = configSnap.exists() ? configSnap.data().bossPassword : "0412888";
+                let cloudBossPassword = configSnap.exists() ? configSnap.data().bossPassword : "0000000";
                 
                 if (bossPass === cloudBossPassword) {
                     closeBossLoginModal();
@@ -248,7 +247,6 @@
             }
         };
 
-        // ⚙️ 點擊小齒輪：開啟更換密碼主視窗
         window.openPasswordSettingsModal = function() {
             document.getElementById('verify-current-boss-pass').value = "";
             document.getElementById('new-staff-pass-input').value = "";
@@ -259,7 +257,6 @@
             document.getElementById('password-settings-overlay').style.display = "none";
         };
 
-        // 🔒 雙密碼獨立修改核心：精準過濾留白，只修改店家有填寫的那一格
         window.executeSaveNewPasswords = async function() {
             const currentVerifyPass = document.getElementById('verify-current-boss-pass').value.trim();
             const newStaffPass = document.getElementById('new-staff-pass-input').value.trim();
@@ -273,18 +270,15 @@
                 const configSnap = await getDoc(configDocRef);
                 let cloudBossPassword = configSnap.exists() ? configSnap.data().bossPassword : "0000000";
 
-                // 第一關：嚴格核對目前高階密碼身分
                 if (currentVerifyPass !== cloudBossPassword) {
                     showCustomAlert("身份驗證失敗！目前的高階密碼輸入錯誤。");
                     return;
                 }
 
-                // 第二關：防呆留白分流判斷，有填寫才塞進空箱子
                 let updateData = {};
                 if (newStaffPass) { updateData.staffPassword = newStaffPass; }
                 if (newBossPass) { updateData.bossPassword = newBossPass; }
 
-                // 第三關：同步寫入雲端
                 await updateDoc(configDocRef, updateData);
                 closePasswordSettingsModal();
                 showCustomAlert("🎉 密碼已順利更新！新設定已即時雲端同步。");
@@ -326,7 +320,7 @@
             if (days === 'custom') {
                 document.getElementById('custom-coupon-days-input').style.display = "block";
             } else {
-                document.getElementById('custom-coupon-days-input').style.none";
+                document.getElementById('custom-coupon-days-input').style.display = "none";
                 document.getElementById('custom-coupon-days-input').value = days;
             }
         };
@@ -960,9 +954,6 @@
         window.loadBossCouponsMaster = loadBossCouponsMaster;
         window.loadExpiryRemindersList = loadExpiryRemindersList;
         window.openRemarkModalDirect = openRemarkModalDirect;
-        window.openPasswordSettingsModal = openPasswordSettingsModal;
-        window.closePasswordSettingsModal = closePasswordSettingsModal;
-        window.executeSaveNewPasswords = executeSaveNewPasswords;
     </script>
 
     <style>
@@ -1038,7 +1029,6 @@
         .modal-btn-danger-confirm { flex: 1; background: #d9534f; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
         .boss-tab-btn { flex: 1; padding: 10px 4px; border-radius: 10px; border: 1px solid #fcdce2; background: white; color: #8a7377; font-weight: bold; font-size: 12px; cursor: pointer; white-space: nowrap; }
         
-        /* ⚙️ 齒輪控制鈕與排版專用樣式 */
         .boss-title-container { display: flex; justify-content: center; align-items: center; position: relative; max-width: 360px; margin: 0 auto; }
         .gear-btn { position: absolute; right: 5px; background: none; border: none; font-size: 22px; cursor: pointer; transition: transform 0.3s; }
         .gear-btn:hover { transform: rotate(45deg); }
@@ -1206,7 +1196,7 @@
             
             <div style="text-align:left; margin-bottom:10px; border-top:1px dashed #fcdce2; padding-top:8px;">
                 <label style="font-size:12px; font-weight:bold; color:#6e5b5e;">🔑 2. 設定「全新」店家密碼 (選填)</label>
-                <input type="password" id="staff-pass-input" placeholder="留白代表不修改" style="margin-top:4px;">
+                <input type="password" id="new-staff-pass-input" placeholder="留白代表不修改" style="margin-top:4px;">
             </div>
             
             <div style="text-align:left; margin-bottom:15px;">
