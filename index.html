@@ -69,21 +69,22 @@
                 .catch(err => showCustomAlert("系統連線失敗，請重開 LINE 再試。"));
         };
 
+        // 🧠 全自動雲端密碼初始化函數：新分店預設為 0000 與 0000000
         async function autoInitializeCloudPassword() {
             try {
                 const configDocRef = doc(db, "system_config", "admin_settings");
                 const configSnap = await getDoc(configDocRef);
                 if (!configSnap.exists()) {
                     await setDoc(configDocRef, {
-                        staffPassword: "0412",       
-                        bossPassword: "0412888",     
+                        staffPassword: "0000",       // 👈 預設新店的店家密碼改為 0000
+                        bossPassword: "0000000",     // 👈 預設新店的高階密碼改為 0000000
                         initializedAt: new Date().toISOString()
                     });
                 } else {
                     const currentData = configSnap.data();
                     if (currentData.bossPassword === undefined) {
                         await updateDoc(configDocRef, {
-                            bossPassword: "0412888"
+                            bossPassword: "0000000"
                         });
                     }
                 }
@@ -210,7 +211,7 @@
                     setTimeout(() => { showCustomAlert("密碼錯誤，請重新解鎖。"); }, 300); 
                 }
             } catch(e) {
-                if (bossPass === "0412888" || bossPass === "5678888") {
+                if (bossPass === "0412888" || bossPass === "0000000") {
                     closeBossLoginModal();
                     document.getElementById('customer-view').style.display = "none";
                     document.getElementById('staff-view').style.display = "none";
@@ -247,6 +248,51 @@
             }
         };
 
+        // ⚙️ 點擊小齒輪：開啟更換密碼主視窗
+        window.openPasswordSettingsModal = function() {
+            document.getElementById('verify-current-boss-pass').value = "";
+            document.getElementById('new-staff-pass-input').value = "";
+            document.getElementById('new-boss-pass-input').value = "";
+            document.getElementById('password-settings-overlay').style.display = "flex";
+        };
+        window.closePasswordSettingsModal = function() {
+            document.getElementById('password-settings-overlay').style.display = "none";
+        };
+
+        // 🔒 雙密碼獨立修改核心：精準過濾留白，只修改店家有填寫的那一格
+        window.executeSaveNewPasswords = async function() {
+            const currentVerifyPass = document.getElementById('verify-current-boss-pass').value.trim();
+            const newStaffPass = document.getElementById('new-staff-pass-input').value.trim();
+            const newBossPass = document.getElementById('new-boss-pass-input').value.trim();
+
+            if (!currentVerifyPass) { showCustomAlert("請輸入目前的高階密碼以驗證身份！"); return; }
+            if (!newStaffPass && !newBossPass) { showCustomAlert("您尚未填寫任何想要修改的新密碼喔！"); return; }
+
+            try {
+                const configDocRef = doc(db, "system_config", "admin_settings");
+                const configSnap = await getDoc(configDocRef);
+                let cloudBossPassword = configSnap.exists() ? configSnap.data().bossPassword : "0000000";
+
+                // 第一關：嚴格核對目前高階密碼身分
+                if (currentVerifyPass !== cloudBossPassword) {
+                    showCustomAlert("身份驗證失敗！目前的高階密碼輸入錯誤。");
+                    return;
+                }
+
+                // 第二關：防呆留白分流判斷，有填寫才塞進空箱子
+                let updateData = {};
+                if (newStaffPass) { updateData.staffPassword = newStaffPass; }
+                if (newBossPass) { updateData.bossPassword = newBossPass; }
+
+                // 第三關：同步寫入雲端
+                await updateDoc(configDocRef, updateData);
+                closePasswordSettingsModal();
+                showCustomAlert("🎉 密碼已順利更新！新設定已即時雲端同步。");
+            } catch(e) {
+                showCustomAlert("雲端連線變更失敗，請稍後再試。");
+            }
+        };
+
         window.changePoints = function(amount) {
             let input = document.getElementById('points-input');
             let current = parseInt(input.value) || 0;
@@ -280,7 +326,7 @@
             if (days === 'custom') {
                 document.getElementById('custom-coupon-days-input').style.display = "block";
             } else {
-                document.getElementById('custom-coupon-days-input').style.display = "none";
+                document.getElementById('custom-coupon-days-input').style.none";
                 document.getElementById('custom-coupon-days-input').value = days;
             }
         };
@@ -842,7 +888,7 @@
             try {
                 const configDocRef = doc(db, "system_config", "admin_settings");
                 const configSnap = await getDoc(configDocRef);
-                let targetStaffPassword = configSnap.exists() ? configSnap.data().staffPassword : "0412";
+                let targetStaffPassword = configSnap.exists() ? configSnap.data().staffPassword : "0000";
 
                 if (document.getElementById('staff-pass').value !== targetStaffPassword) { 
                     showCustomAlert("管理密碼錯誤！"); 
@@ -850,7 +896,7 @@
                 }
             } catch(e) {
                 let inputPass = document.getElementById('staff-pass').value;
-                if (inputPass !== "0412" && inputPass !== "5678") {
+                if (inputPass !== "0412" && inputPass !== "0000") {
                     showCustomAlert("密碼錯誤且無法連線至雲端資料庫。");
                     return;
                 }
@@ -914,6 +960,9 @@
         window.loadBossCouponsMaster = loadBossCouponsMaster;
         window.loadExpiryRemindersList = loadExpiryRemindersList;
         window.openRemarkModalDirect = openRemarkModalDirect;
+        window.openPasswordSettingsModal = openPasswordSettingsModal;
+        window.closePasswordSettingsModal = closePasswordSettingsModal;
+        window.executeSaveNewPasswords = executeSaveNewPasswords;
     </script>
 
     <style>
@@ -988,6 +1037,11 @@
         .modal-btn-confirm { flex: 1; background: #ffeef0; color: #c97288; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
         .modal-btn-danger-confirm { flex: 1; background: #d9534f; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
         .boss-tab-btn { flex: 1; padding: 10px 4px; border-radius: 10px; border: 1px solid #fcdce2; background: white; color: #8a7377; font-weight: bold; font-size: 12px; cursor: pointer; white-space: nowrap; }
+        
+        /* ⚙️ 齒輪控制鈕與排版專用樣式 */
+        .boss-title-container { display: flex; justify-content: center; align-items: center; position: relative; max-width: 360px; margin: 0 auto; }
+        .gear-btn { position: absolute; right: 5px; background: none; border: none; font-size: 22px; cursor: pointer; transition: transform 0.3s; }
+        .gear-btn:hover { transform: rotate(45deg); }
     </style>
 </head>
 <body>
@@ -1076,7 +1130,10 @@
     </div>
 
     <div id="boss-view" style="display:none; background-color: #fffbfc; padding: 15px 5px;" class="card">
-        <h2>高階後台系統</h2>
+        <div class="boss-title-container">
+            <h2>高階後台系統</h2>
+            <button class="gear-btn" onclick="openPasswordSettingsModal()">⚙️</button>
+        </div>
         
         <div class="boss-nav-tabs">
             <button id="tab-btn-cust" class="boss-tab-btn tab-active" onclick="switchBossTab('customer-list-page')">❤️ 會員名冊</button>
@@ -1136,6 +1193,33 @@
     <div id="delete-member-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title" style="color: #d9534f;">🚨 永久刪除會員</div><div id="delete-member-msg" class="modal-text">確認刪除訊息</div><input type="text" id="delete-confirm-input" placeholder="請精準輸入 del" style="margin-top:8px; margin-bottom:5px;"><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeDeleteMemberModal()">取消</button><button class="modal-btn-danger-confirm" onclick="executeDeleteMember()">強行永久刪除</button></div></div></div>
     <div id="unpublish-coupon-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">❌ 下架商品確認</div><div id="unpublish-coupon-msg" class="modal-text"></div><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeUnpublishCouponModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeUnpublishCoupon()">確定移除下架</button></div></div></div>
     <div id="remark-name-overlay" class="modal-overlay"><div class="modal-box" style="border: 2px dashed #c97288;"><div id="remark-user-title" class="modal-title">修改店家備註姓名</div><div class="modal-text" style="font-size:12px; color:#8a7377;">此備註僅會顯示在店家後台，方便您識別客戶。</div><input type="text" id="remark-name-input" placeholder="例如：李小姐 (每週五固定)"><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeRemarkModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeSaveRemark()">儲存修改</button></div></div></div>
+
+    <div id="password-settings-overlay" class="modal-overlay">
+        <div class="modal-box" style="border: 2px solid #c97288; max-width:340px;">
+            <div class="modal-title">⚙️ 雲端密碼自主控制台</div>
+            <div class="modal-text" style="font-size:11px; color:#8a7377; line-height:1.4; margin-bottom:12px; text-align:left;">💡 <strong>留白防呆提示</strong>：留空不填代表「維持原密碼」不修改。欄位一則為必填安全核對區。</div>
+            
+            <div style="text-align:left; margin-bottom:10px;">
+                <label style="font-size:12px; font-weight:bold; color:#d9534f;">🔒 1. 輸入「目前」高階密碼 (必填)</label>
+                <input type="password" id="verify-current-boss-pass" placeholder="請輸入目前的高階密碼進行身分核對" style="margin-top:4px;">
+            </div>
+            
+            <div style="text-align:left; margin-bottom:10px; border-top:1px dashed #fcdce2; padding-top:8px;">
+                <label style="font-size:12px; font-weight:bold; color:#6e5b5e;">🔑 2. 設定「全新」店家密碼 (選填)</label>
+                <input type="password" id="staff-pass-input" placeholder="留白代表不修改" style="margin-top:4px;">
+            </div>
+            
+            <div style="text-align:left; margin-bottom:15px;">
+                <label style="font-size:12px; font-weight:bold; color:#c97288;">👑 3. 設定「全新」高階密碼 (選填)</label>
+                <input type="password" id="new-boss-pass-input" placeholder="留白代表不修改" style="margin-top:4px;">
+            </div>
+            
+            <div class="modal-btn-row">
+                <button class="modal-btn-cancel" onclick="closePasswordSettingsModal()">取消關閉</button>
+                <button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeSaveNewPasswords()">確認變更儲存</button>
+            </div>
+        </div>
+    </div>
 
     <div id="exchange-confirm-overlay" class="modal-overlay">
         <div class="modal-box" style="border: 2px solid #c97288; max-width:340px;">
