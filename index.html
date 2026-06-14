@@ -954,6 +954,9 @@
         window.loadBossCouponsMaster = loadBossCouponsMaster;
         window.loadExpiryRemindersList = loadExpiryRemindersList;
         window.openRemarkModalDirect = openRemarkModalDirect;
+        window.openPasswordSettingsModal = openPasswordSettingsModal;
+        window.closePasswordSettingsModal = closePasswordSettingsModal;
+        window.executeSaveNewPasswords = executeSaveNewPasswords;
     </script>
 
     <style>
@@ -1030,8 +1033,9 @@
         .boss-tab-btn { flex: 1; padding: 10px 4px; border-radius: 10px; border: 1px solid #fcdce2; background: white; color: #8a7377; font-weight: bold; font-size: 12px; cursor: pointer; white-space: nowrap; }
         
         .boss-title-container { display: flex; justify-content: center; align-items: center; position: relative; max-width: 360px; margin: 0 auto; }
-        .gear-btn { position: absolute; right: 5px; background: none; border: none; font-size: 22px; cursor: pointer; transition: transform 0.3s; }
-        .gear-btn:hover { transform: rotate(45deg); }
+        /* 🗝️ 專屬奢華定位按鈕樣式 */
+        .gear-btn { position: absolute; right: 5px; background: none; border: none; font-size: 22px; cursor: pointer; transition: transform 0.2s; }
+        .gear-btn:hover { transform: scale(1.1); }
     </style>
 </head>
 <body>
@@ -1122,7 +1126,7 @@
     <div id="boss-view" style="display:none; background-color: #fffbfc; padding: 15px 5px;" class="card">
         <div class="boss-title-container">
             <h2>高階後台系統</h2>
-            <button class="gear-btn" onclick="openPasswordSettingsModal()">⚙️</button>
+            <button class="gear-btn" onclick="openPasswordSettingsModal()">🗝️</button>
         </div>
         
         <div class="boss-nav-tabs">
@@ -1186,21 +1190,21 @@
 
     <div id="password-settings-overlay" class="modal-overlay">
         <div class="modal-box" style="border: 2px solid #c97288; max-width:340px;">
-            <div class="modal-title">⚙️ 雲端密碼自主控制台</div>
-            <div class="modal-text" style="font-size:11px; color:#8a7377; line-height:1.4; margin-bottom:12px; text-align:left;">💡 <strong>留白防呆提示</strong>：留空不填代表「維持原密碼」不修改。欄位一則為必填安全核對區。</div>
+            <div class="modal-title">密碼修改</div>
+            <div class="modal-text" style="font-size:11px; color:#8a7377; line-height:1.4; margin-bottom:12px; text-align:left;">💡 留空不填代表「維持原密碼」不修改。</div>
             
             <div style="text-align:left; margin-bottom:10px;">
-                <label style="font-size:12px; font-weight:bold; color:#d9534f;">🔒 1. 輸入「目前」高階密碼 (必填)</label>
+                <label style="font-size:12px; font-weight:bold; color:#d9534f;">1. 輸入「目前」高階密碼 (必填)</label>
                 <input type="password" id="verify-current-boss-pass" placeholder="請輸入目前的高階密碼進行身分核對" style="margin-top:4px;">
             </div>
             
             <div style="text-align:left; margin-bottom:10px; border-top:1px dashed #fcdce2; padding-top:8px;">
-                <label style="font-size:12px; font-weight:bold; color:#6e5b5e;">🔑 2. 設定「全新」店家密碼 (選填)</label>
+                <label style="font-size:12px; font-weight:bold; color:#6e5b5e;">2. 設定「全新」店家密碼 (選填)</label>
                 <input type="password" id="new-staff-pass-input" placeholder="留白代表不修改" style="margin-top:4px;">
             </div>
             
             <div style="text-align:left; margin-bottom:15px;">
-                <label style="font-size:12px; font-weight:bold; color:#c97288;">👑 3. 設定「全新」高階密碼 (選填)</label>
+                <label style="font-size:12px; font-weight:bold; color:#c97288;">3. 設定「全新」高階密碼 (選填)</label>
                 <input type="password" id="new-boss-pass-input" placeholder="留白代表不修改" style="margin-top:4px;">
             </div>
             
