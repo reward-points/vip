@@ -614,7 +614,7 @@
 
         async function loadExpiryRemindersList() {
             const box = document.getElementById('boss-reminder-list');
-            box.innerHTML = "<div style='text-align:center; padding:15px; color:#a18b8f;'>🌸 正在深度掃描未來 21 天內即將過期的所有明細...</div>";
+            box.innerHTML = "<div style='text-align:center; padding:15px; color:#a18b8f;'>🌸 正在深度慢速撈取...</div>";
             
             try {
                 const now = new Date();
@@ -1033,9 +1033,10 @@
         .boss-tab-btn { flex: 1; padding: 10px 4px; border-radius: 10px; border: 1px solid #fcdce2; background: white; color: #8a7377; font-weight: bold; font-size: 12px; cursor: pointer; white-space: nowrap; }
         
         .boss-title-container { display: flex; justify-content: center; align-items: center; position: relative; max-width: 360px; margin: 0 auto; }
-        /* 🗝️ 專屬奢華定位按鈕樣式 */
-        .gear-btn { position: absolute; right: 5px; background: none; border: none; font-size: 22px; cursor: pointer; transition: transform 0.2s; }
-        .gear-btn:hover { transform: scale(1.1); }
+        
+        /* 🗝️ 專屬奢華定位按鈕樣式 - 縮小微調版 */
+        .gear-btn { position: absolute; right: 8px; background: none; border: none; font-size: 16px; cursor: pointer; transition: transform 0.2s; opacity: 0.85; }
+        .gear-btn:hover { transform: scale(1.1); opacity: 1; }
     </style>
 </head>
 <body>
@@ -1209,8 +1210,8 @@
             </div>
             
             <div class="modal-btn-row">
-                <button class="modal-btn-cancel" onclick="closePasswordSettingsModal()">取消關閉</button>
-                <button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeSaveNewPasswords()">確認變更儲存</button>
+                <button class="modal-btn-cancel" onclick="closePasswordSettingsModal()">取消</button>
+                <button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeSaveNewPasswords()">儲存</button>
             </div>
         </div>
     </div>
