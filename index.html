@@ -281,7 +281,7 @@
 
                 await updateDoc(configDocRef, updateData);
                 closePasswordSettingsModal();
-                showCustomAlert("🎉 密碼已順利更新！新設定已即時雲端同步。");
+                showCustomAlert("密碼已更新");
             } catch(e) {
                 showCustomAlert("雲端連線變更失敗，請稍後再試。");
             }
