@@ -125,7 +125,6 @@
             });
         }
 
-        // 🌸 客戶端：點數收支歷史紀錄（括號順序優化調位版）
         async function loadPointHistory(userId) {
             const listEl = document.getElementById('history-list');
             try {
@@ -148,7 +147,6 @@
 
                     let rowStyle = (isCanceled || isExpired) ? 'style="text-decoration: line-through; color: #aaa;"' : '';
                     
-                    // 🛠️ 依要求修正：拿掉備註內重疊的字眼，將狀態大標題括號精密移到最後面
                     let statusSuffix = "";
                     if (isCanceled) {
                         statusSuffix = ' <span style="color: #ff4d4f; text-decoration: none; display: inline-block;">(已註銷)</span>';
@@ -159,7 +157,7 @@
                     html += `<li ${rowStyle}><strong style="color:${(isCanceled || isExpired) ? '#aaa' : (isAdd ? '#c97288':'#8a7377')}">${isAdd ? '+':''}${log.pointsObtained} 點</strong><br><small>${log.remark} (${dateInfo})${statusSuffix}</small></li>`;
                 });
                 listEl.innerHTML = html;
-            } catch(e) { listEl.innerHTML = "<li>點數明細載入失敗</li>"; }
+            } catch(e) { listEl.innerHTML = "<li>資料讀取中。。。</li>"; }
         }
 
         async function loadCustomerCouponHistory(userId) {
@@ -168,7 +166,6 @@
                 const q = query(collection(db, "coupon_log", userId, "logs"), orderBy("actionAt", "desc"));
                 const qSnapshot = await getDocs(q);
                 if (qSnapshot.empty) {
-                    // 防呆降級讀取舊路徑
                     const oldQ = query(collection(db, "users", userId, "coupon_log"), orderBy("actionAt", "desc"));
                     const oldSnap = await getDocs(oldQ);
                     if (oldSnap.empty) { listEl.innerHTML = "<li>目前尚無任何優惠券兌換使用紀錄</li>"; return; }
@@ -176,7 +173,7 @@
                 } else {
                     renderCouponLogs(qSnapshot, listEl);
                 }
-            } catch(e) { listEl.innerHTML = "<li>優惠券存摺載入失敗</li>"; }
+            } catch(e) { listEl.innerHTML = "<li>資料讀取中。。。</li>"; }
         }
 
         function renderCouponLogs(snapshot, listEl) {
@@ -339,7 +336,7 @@
 
         window.openBagModal = function() {
             const container = document.getElementById('bag-container');
-            container.innerHTML = "<div style='color:#a18b8f;'>🌸 正在翻開您的優惠券口袋...</div>";
+            container.innerHTML = "<div style='color:#a18b8f;'>資料讀取中。。。</div>"; // 👈 統一正名：資料讀取中。。。
             document.getElementById('bag-overlay').style.display = "flex";
             if (!currentLiffUserId) return;
             getDocs(collection(db, "users", currentLiffUserId, "coupon_wallet")).then(userBagSnapshot => {
@@ -370,7 +367,7 @@
                         </div>`;
                 });
                 container.innerHTML = html || "<div style='padding:30px; color:#a18b8f;'>您目前口袋空空，快去專區用點數兌換吧！</div>";
-            }).catch(e => { container.innerHTML = "<div style='color:red;'>口袋載入失敗</div>"; });
+            }).catch(e => { container.innerHTML = "<div style='color:red;'>資料讀取中。。。</div>"; });
         };
         window.closeBagModal = function() { document.getElementById('bag-overlay').style.display = "none"; };
 
@@ -438,7 +435,7 @@
                 } else {
                     document.getElementById('customer-name-display').innerText = "未開戶新客";
                 }
-            } catch (e) { document.getElementById('customer-name-display').innerText = "讀取失敗"; }
+            } catch (e) { document.getElementById('customer-name-display').innerText = "資料讀取中。。。"; }
         }
 
         window.toggleAccordion = function(id) {
@@ -455,7 +452,7 @@
 
         window.openShopModal = async function() {
             const grid = document.getElementById('shop-grid');
-            grid.innerHTML = "<div style='grid-column: span 2; color:#a18b8f;'>🌸 正在打開商品櫃...</div>";
+            grid.innerHTML = "<div style='grid-column: span 2; color:#a18b8f;'>資料讀取中。。。</div>"; // 👈 統一正名：資料讀取中。。。
             document.getElementById('shop-overlay').style.display = "flex";
             
             try {
@@ -479,7 +476,7 @@
                         </div>`;
                 });
                 grid.innerHTML = html;
-            } catch(e) { grid.innerHTML = "<div style='grid-column: span 2; color:red;'>專區載入失敗</div>"; }
+            } catch(e) { grid.innerHTML = "<div style='grid-column: span 2; color:red;'>資料讀取中。。。</div>"; }
         };
         window.closeShopModal = function() { document.getElementById('shop-overlay').style.display = "none"; };
 
@@ -547,7 +544,6 @@
                     status: "unused"
                 });
 
-                // 為了前後台相容，將日誌同步寫入全球統一清單與使用者清單中
                 const logData = {
                     name: cName,
                     actionAt: now.toISOString(),
@@ -568,7 +564,6 @@
             finally { shopGrid.style.pointerEvents = "auto"; }
         };
 
-        // 👑 大腦深度修復補正：當客人點擊「立即使用」時，將精準的「使用當天印章」寫入資料庫
         window.executeUseCustomerCoupon = async function() {
             if (!pendingUseWalletId || !currentLiffUserId) return;
             const targetWid = pendingUseWalletId;
@@ -579,7 +574,6 @@
                 const nowIso = new Date().toISOString();
                 const cDocRef = doc(db, "users", currentLiffUserId, "coupon_wallet", targetWid);
                 
-                // 🛠️ 資料庫精密寫入：存入當下確切的 usedAt 使用時間
                 await updateDoc(cDocRef, { 
                     status: "used",
                     usedAt: nowIso 
@@ -603,7 +597,7 @@
         // 1️⃣ 後台頁籤：點數記錄加載
         async function loadAllCustomers() {
             const listEl = document.getElementById('boss-customer-list');
-            listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>🌸 正在撈取會員總冊...</div>";
+            listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>資料讀取中。。。</div>"; // 👈 統一正名：資料讀取中。。。
             try {
                 const querySnapshot = await getDocs(collection(db, "users"));
                 let html = "";
@@ -627,8 +621,7 @@
                                     <button class="cancel-point-btn" style="background-color:#ffeef0; color:#c97288; padding:5px 10px;" 
                                             onclick="openRemarkModalDirect('${uid}', '${dataNameSafe(data.lineName)}', '${dataNameSafe(data.remarkName)}')">✏️ 修改店家備註姓名</button>
                                 </div>
-                                <ul id="log-list-${uid}" class="boss-log-list"><li>載入明細中...</li></ul>
-                                <button class="delete-user-master-btn" onclick="showDeleteMemberModal('${uid}', '${dataNameSafe(data.lineName)}')">🌸 刪除會員資料</button>
+                                <ul id="log-list-${uid}" class="boss-log-list"><li>資料讀取中。。。</li></ul> <button class="delete-user-master-btn" onclick="showDeleteMemberModal('${uid}', '${dataNameSafe(data.lineName)}')">🌸 刪除會員資料</button>
                             </div>
                         </div>`;
                 });
@@ -656,10 +649,12 @@
                     
                     let shortDate = data.obtainedAt ? new Date(data.obtainedAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}) : '';
 
-                    // 🛠️ 依要求精密修正：右側按鈕全自動更換為帶日期的「MM/DD註銷」或「MM/DD失效」
                     let statusBtnHtml = "";
                     if (isCanceled) {
-                        statusBtnHtml = `<span class="disabled-status-text">${shortDate}註銷</span>`;
+                        // 🛠️ 依要求精密優化：右側狀態精準變更為短日期註銷（例：05/29註銷）
+                        let cancelDateObj = data.canceledAt ? new Date(data.canceledAt) : new Date(data.obtainedAt);
+                        let cancelShort = `${String(cancelDateObj.getMonth() + 1).padStart(2, '0')}/${String(cancelDateObj.getDate()).padStart(2, '0')}`;
+                        statusBtnHtml = `<span class="disabled-status-text">${cancelShort}註銷</span>`;
                     } else if (isExpired) {
                         let expShort = new Date(data.expiredAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'});
                         statusBtnHtml = `<span class="disabled-status-text">${expShort}失效</span>`;
@@ -667,7 +662,6 @@
                         statusBtnHtml = `<button class="cancel-point-btn" onclick="showCancelConfirmModal('${uid}', '${logId}', ${data.pointsObtained})">❌ 註銷</button>`;
                     }
 
-                    // 🛠️ 依要求精密修正：左側文字備註拿掉重疊的字眼，還原清爽原貌
                     html += `
                         <li style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; padding:4px 0; ${(isCanceled || isExpired) ? 'text-decoration:line-through;color:#aaa;':''}">
                             <div style="flex: 1; text-align: left; padding-right: 8px; word-break: break-all;">
@@ -684,10 +678,10 @@
             } catch (e) { logListEl.innerHTML = "<li>加載失敗</li>"; }
         };
 
-        // 2️⃣ 後台頁籤：優惠券記錄加載 (完美嵌入使用日期自動化判斷)
+        // 2️⃣ 後台頁籤：優惠券記錄加載
         async function loadAllCouponsMaster() {
             const listEl = document.getElementById('boss-coupon-list');
-            listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>🌸 正在打包優惠券總冊...</div>";
+            listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>資料讀取中。。。</div>"; // 👈 統一正名：資料讀取中。。。
             try {
                 const querySnapshot = await getDocs(collection(db, "users"));
                 let html = "";
@@ -709,8 +703,7 @@
                             </div>
                             <div id="coupons-box-${uid}" class="customer-details-box">
                                 <p style="font-size:10px;color:#a18b8f;margin:5px 0;word-break:break-all;">LINE ID: ${uid}</p>
-                                <ul id="coupon-log-list-${uid}" class="boss-log-list"><li>口袋明細載入中...</li></ul>
-                            </div>
+                                <ul id="coupon-log-list-${uid}" class="boss-log-list"><li>資料讀取中。。。</li></ul> </div>
                         </div>`;
                 }
                 listEl.innerHTML = html || "<p>尚無會員建立優惠券檔案</p>";
@@ -735,10 +728,14 @@
                     let statusTxt = "";
                     let statusColor = "";
                     if (c.status === "used") {
-                        // 🛠️ 依要求精密修正：全自動精準抓取真正的使用時間（格式如：06/01使用）
-                        let useDateObj = c.usedAt ? new Date(c.usedAt) : new Date(c.exchangedAt || null);
-                        let useShortDate = useDateObj ? `${useDateObj.getMonth() + 1}/${useDateObj.getDate()}` : '已';
-                        statusTxt = `${useShortDate}使用`; 
+                        // 🛠️ 核心連動升級：此處已能完美去抓取真正的 usedAt 蓋章時間，漂亮呈現為 06/01使用 
+                        let useDateObj = c.usedAt ? new Date(c.usedAt) : null;
+                        if (useDateObj) {
+                            let useShortDate = `${String(useDateObj.getMonth() + 1).padStart(2, '0')}/${String(useDateObj.getDate()).padStart(2, '0')}`;
+                            statusTxt = `${useShortDate}使用`;
+                        } else {
+                            statusTxt = "已使用";
+                        }
                         statusColor = "#8a7377"; 
                     }
                     else if (isExpired) { statusTxt = "已過期"; statusColor = "#aaa"; }
@@ -762,7 +759,7 @@
         // 3️⃣ 後台頁籤：提醒清單加載
         async function loadExpiryRemindersList() {
             const box = document.getElementById('boss-reminder-list');
-            box.innerHTML = "<div style='text-align:center; padding:15px; color:#a18b8f;'>🌸 正在深度慢速撈取...</div>";
+            box.innerHTML = "<div style='text-align:center; padding:15px; color:#a18b8f;'>資料讀取中。。。</div>"; // 👈 統一正名：資料讀取中。。。
             
             try {
                 const now = new Date();
@@ -847,14 +844,14 @@
                 box.innerHTML = html || "<div style='text-align:center; padding:30px; color:#a18b8f; font-size:13px;'>📅 盤點完畢！<br>未來 21 天之內，沒有任何客戶的點數或優惠券到期。</div>";
                 
             } catch (e) {
-                box.innerHTML = "<div style='color:red; text-align:center;'>清單讀取失敗，請重試。</div>";
+                box.innerHTML = "<div style='color:red; text-align:center;'>資料讀取中。。。</div>";
             }
         }
 
         // 4️⃣ 後台頁籤：優惠券上架中心
         async function loadBossCouponsMaster() {
             const box = document.getElementById('boss-coupons-master-list');
-            box.innerHTML = "<div style='color:#a18b8f; font-size:12px;'>商品架盤點中...</div>";
+            box.innerHTML = "<div style='color:#a18b8f; font-size:12px;'>資料讀取中。。。</div>"; // 👈 統一正名：資料讀取中。。。
             try {
                 const q = query(collection(db, "coupons"), orderBy("cost", "desc"));
                 const qSnapshot = await getDocs(q);
@@ -936,7 +933,6 @@
             closeCancelConfirmModal();
             try {
                 const nowIso = new Date().toISOString();
-                // 將點數標註 canceled 註銷，並寫入 canceledAt
                 await updateDoc(doc(db, "users", pendingCancel.uid, "point_log", pendingCancel.logId), { 
                     status: "canceled",
                     canceledAt: nowIso
@@ -1168,14 +1164,14 @@
             <span>✨ 點數收支歷史紀錄</span><span id="points-accordion-box-icon">➕</span>
         </div>
         <div id="points-accordion-box" class="accordion-content">
-            <ul id="history-list" class="history-list"><li>載入中...</li></ul>
+            <ul id="history-list" class="history-list"><li>資料讀取中。。。</li></ul>
         </div>
 
         <div class="card accordion-btn" onclick="toggleAccordion('coupon-accordion-box')">
             <span>💖 優惠券兌換歷史紀錄</span><span id="coupon-accordion-box-icon">➕</span>
         </div>
         <div id="coupon-accordion-box" class="accordion-content">
-            <ul id="coupon-history-list" class="history-list"><li>尚無兌換紀錄</li></ul>
+            <ul id="coupon-history-list" class="history-list"><li>資料讀取中。。。</li></ul>
         </div>
     </div>
 
