@@ -133,20 +133,27 @@
                 if (qSnapshot.empty) { listEl.innerHTML = "<li>目前尚無點數收支紀錄</li>"; return; }
                 
                 let html = "";
+                let nowTime = new Date().getTime();
                 qSnapshot.forEach(docSnap => {
                     const log = docSnap.data();
                     let isCanceled = log.status === "canceled"; 
                     let isAdd = log.pointsObtained > 0;
+                    let isExpired = (!isCanceled && isAdd && log.expiredAt && (nowTime > new Date(log.expiredAt).getTime()));
                     
                     let dateInfo = new Date(log.obtainedAt).toLocaleDateString();
                     if (isAdd && log.expiredAt) {
                         dateInfo += ` ~ ${new Date(log.expiredAt).toLocaleDateString()}`;
                     }
 
-                    let rowStyle = isCanceled ? 'style="text-decoration: line-through; color: #aaa;"' : '';
-                    let cancelText = isCanceled ? ' <span style="color: #ff4d4f; text-decoration: none; display: inline-block;">(已註銷)</span>' : '';
+                    let rowStyle = (isCanceled || isExpired) ? 'style="text-decoration: line-through; color: #aaa;"' : '';
+                    let cancelText = "";
+                    if (isCanceled) {
+                        cancelText = ' <span style="color: #ff4d4f; text-decoration: none; display: inline-block;">(已註銷)</span>';
+                    } else if (isExpired) {
+                        cancelText = ' <span style="color: #999; text-decoration: none; display: inline-block;">(已過期)</span>';
+                    }
 
-                    html += `<li ${rowStyle}><strong style="color:${isCanceled ? '#aaa' : (isAdd ? '#c97288':'#8a7377')}">${isAdd ? '+':''}${log.pointsObtained} 點</strong><br><small>${log.remark}${cancelText} (${dateInfo})</small></li>`;
+                    html += `<li ${rowStyle}><strong style="color:${(isCanceled || isExpired) ? '#aaa' : (isAdd ? '#c97288':'#8a7377')}">${isAdd ? '+':''}${log.pointsObtained} 點</strong><br><small>${log.remark}${cancelText} (${dateInfo})</small></li>`;
                 });
                 listEl.innerHTML = html;
             } catch(e) { listEl.innerHTML = "<li>點數明細載入失敗</li>"; }
@@ -256,27 +263,34 @@
             }
         };
 
+        // 🎛️ 四大帳本分流切換大腦
         window.switchBossTab = function(pageId) {
             document.getElementById('customer-list-page').style.display = "none";
-            document.getElementById('coupon-factory-page').style.display = "none";
+            document.getElementById('coupon-list-page').style.display = "none";
             document.getElementById('reminder-list-page').style.display = "none";
+            document.getElementById('coupon-factory-page').style.display = "none";
             
             document.getElementById('tab-btn-cust').className = 'boss-tab-btn';
-            document.getElementById('tab-btn-fac').className = 'boss-tab-btn';
+            document.getElementById('tab-btn-coup').className = 'boss-tab-btn';
             document.getElementById('tab-btn-remind').className = 'boss-tab-btn';
+            document.getElementById('tab-btn-fac').className = 'boss-tab-btn';
             
             if (pageId === 'customer-list-page') {
                 document.getElementById('customer-list-page').style.display = "block";
                 document.getElementById('tab-btn-cust').className = 'boss-tab-btn tab-active';
                 loadAllCustomers(); 
-            } else if (pageId === 'coupon-factory-page') {
-                document.getElementById('coupon-factory-page').style.display = "block";
-                document.getElementById('tab-btn-fac').className = 'boss-tab-btn tab-active';
-                loadBossCouponsMaster(); 
+            } else if (pageId === 'coupon-list-page') {
+                document.getElementById('coupon-list-page').style.display = "block";
+                document.getElementById('tab-btn-coup').className = 'boss-tab-btn tab-active';
+                loadAllCouponsMaster();
             } else if (pageId === 'reminder-list-page') {
                 document.getElementById('reminder-list-page').style.display = "block";
                 document.getElementById('tab-btn-remind').className = 'boss-tab-btn tab-active';
                 loadExpiryRemindersList(); 
+            } else if (pageId === 'coupon-factory-page') {
+                document.getElementById('coupon-factory-page').style.display = "block";
+                document.getElementById('tab-btn-fac').className = 'boss-tab-btn tab-active';
+                loadBossCouponsMaster(); 
             }
         };
 
@@ -292,7 +306,7 @@
 
         window.executeSaveNewPasswords = async function() {
             const currentVerifyPass = document.getElementById('verify-current-boss-pass').value.trim();
-            const newStaffPass = document.getElementById('staff-pass-input').value.trim(); // 👈 關鍵防呆修正：已成功對齊最下方的 HTML ID
+            const newStaffPass = document.getElementById('staff-pass-input').value.trim(); 
             const newBossPass = document.getElementById('new-boss-pass-input').value.trim();
 
             if (!currentVerifyPass) { showCustomAlert("請輸入目前的高階密碼以驗證身份！"); return; }
@@ -320,43 +334,6 @@
             }
         };
 
-        window.openBagModal = function() {
-            const container = document.getElementById('bag-container');
-            container.innerHTML = "<div style='color:#a18b8f;'>🌸 正在翻開您的優惠券口袋...</div>";
-            document.getElementById('bag-overlay').style.display = "flex";
-            if (!currentLiffUserId) return;
-            getDocs(collection(db, "users", currentLiffUserId, "coupon_wallet")).then(userBagSnapshot => {
-                let activeCoupons = [];
-                userBagSnapshot.forEach(docSnap => {
-                    const wData = docSnap.data();
-                    if (wData.status === "unused" && (new Date() <= new Date(wData.expiredAt))) {
-                        activeCoupons.push({
-                            id: docSnap.id,
-                            name: wData.name,
-                            expiredAt: wData.expiredAt,
-                            expTime: new Date(wData.expiredAt).getTime()
-                        });
-                    }
-                });
-
-                activeCoupons.sort((a, b) => a.expTime - b.expTime);
-
-                let html = "";
-                activeCoupons.forEach(coupon => {
-                    html += `
-                        <div class="bag-item">
-                            <div style="text-align:left; max-width: 65%;">
-                                <div class="bag-item-title">🎀 ${coupon.name}</div>
-                                <div class="bag-item-date">🌸 有效期至: ${new Date(coupon.expiredAt).toLocaleDateString()}</div>
-                            </div>
-                            <button class="bag-use-btn" onclick="showUseCouponConfirmModal('${coupon.id}', '${dataNameSafe(coupon.name)}')">立即使用</button>
-                        </div>`;
-                });
-                container.innerHTML = html || "<div style='padding:30px; color:#a18b8f;'>您目前口袋空空，快去專區用點數兌換吧！</div>";
-            }).catch(e => { container.innerHTML = "<div style='color:red;'>口袋載入失敗</div>"; });
-        };
-        window.closeBagModal = function() { document.getElementById('bag-overlay').style.display = "none"; };
-
         window.changePoints = function(amount) {
             let input = document.getElementById('points-input');
             let current = parseInt(input.value) || 0;
@@ -364,6 +341,18 @@
             input.value = newVal;
             toggleFormFields(newVal);
         };
+
+        function toggleFormFields(val) {
+            if (val < 0) {
+                document.getElementById('remark-add-group').style.display = "none";
+                document.getElementById('remark-deduct-group').style.display = "block";
+                document.getElementById('expiry-group').style.display = "none";
+            } else {
+                document.getElementById('remark-add-group').style.display = "block";
+                document.getElementById('remark-deduct-group').style.display = "none";
+                document.getElementById('expiry-group').style.display = "block";
+            }
+        }
 
         window.setExpireDays = function(days) {
             if (days === 'custom') {
@@ -378,7 +367,7 @@
             if (days === 'custom') {
                 document.getElementById('custom-coupon-days-input').style.display = "block";
             } else {
-                document.getElementById('custom-coupon-days-input').style.display = "none"; // 👈 關鍵防呆修正：補齊了語法打結
+                document.getElementById('custom-coupon-days-input').style.display = "none"; 
                 document.getElementById('custom-coupon-days-input').value = days;
             }
         };
@@ -438,7 +427,7 @@
 
         window.openShopModal = async function() {
             const grid = document.getElementById('shop-grid');
-            grid.innerHTML = "<div style='grid-column: span 2; color:#a18b8f;'>🌸 正在打開點數專區商品櫃...</div>";
+            grid.innerHTML = "<div style='grid-column: span 2; color:#a18b8f;'>🌸 正在打開商品櫃...</div>";
             document.getElementById('shop-overlay').style.display = "flex";
             
             try {
@@ -520,9 +509,10 @@
                     obtainedAt: now.toISOString(),
                     expiredAt: now.toISOString(),
                     status: "deducted",
-                    remark: `專區兌換: ${cName}`
+                    remark: `專專區兌換: ${cName}`
                 });
 
+                // ✨ 精密對帳核心：將兌換的優惠券寫入獨立的 coupon_wallet 以及歷史日誌中
                 await addDoc(collection(db, "users", currentLiffUserId, "coupon_wallet"), {
                     name: cName,
                     exchangedAt: now.toISOString(),
@@ -534,7 +524,8 @@
                     name: cName,
                     actionAt: now.toISOString(),
                     type: "exchange",
-                    detail: `花費 ${cost} 點兌換成功`
+                    detail: `花費 ${cost} 點兌換成功`,
+                    status: "valid"
                 });
 
                 showCustomAlert("🎉 成功兌換【" + cName + "】！\n已自餘額扣除 " + cost + " 點，請於 " + targetValidDays + " 天內使用完畢。");
@@ -547,41 +538,7 @@
             finally { shopGrid.style.pointerEvents = "auto"; }
         };
 
-        window.showUseCouponConfirmModal = function(wid, cName) {
-            pendingUseWalletId = wid;
-            pendingUseCouponName = cName;
-            document.getElementById('use-coupon-confirm-msg').innerText = `立即使用【${cName}】嗎？\n請與店家核對，使用後此券將永久消失！`;
-            document.getElementById('use-coupon-confirm-overlay').style.display = "flex";
-        };
-        window.closeUseCouponConfirmModal = function() {
-            document.getElementById('use-coupon-confirm-overlay').style.display = "none";
-            pendingUseWalletId = "";
-            pendingUseCouponName = "";
-        };
-
-        window.executeUseCustomerCoupon = async function() {
-            if (!pendingUseWalletId || !currentLiffUserId) return;
-            const targetWid = pendingUseWalletId;
-            const targetName = pendingUseCouponName;
-            closeUseCouponConfirmModal();
-
-            try {
-                const cDocRef = doc(db, "users", currentLiffUserId, "coupon_wallet", targetWid);
-                await updateDoc(cDocRef, { status: "used" });
-
-                await addDoc(collection(db, "users", currentLiffUserId, "coupon_log"), {
-                    name: targetName,
-                    actionAt: new Date().toISOString(),
-                    type: "use",
-                    detail: "成功使用優惠券"
-                });
-
-                showCustomAlert(`✅【${targetName}】已成功使用！\n歡迎再度光臨！`);
-                loadCustomerCouponHistory(currentLiffUserId);
-                closeBagModal();
-            } catch(e) { showCustomAlert("操作失敗，請重試"); }
-        };
-        
+        // 1️⃣ 頁籤：載入全店點數名冊
         async function loadAllCustomers() {
             const listEl = document.getElementById('boss-customer-list');
             listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>🌸 正在撈取會員總冊...</div>";
@@ -617,6 +574,7 @@
             } catch (e) { listEl.innerHTML = "<p>載入失敗</p>"; }
         }
 
+        // 🔍 點開名冊：載入個人點數帳本（包含過期、註銷雙貼標＋微小字日期）
         window.toggleCustomerDetails = async function(uid) {
             const box = document.getElementById(`details-${uid}`);
             box.style.display = box.style.display === "block" ? "none" : "block";
@@ -627,26 +585,105 @@
                 const q = query(collection(db, "users", uid, "point_log"), orderBy("obtainedAt", "desc"));
                 const querySnapshot = await getDocs(q);
                 let html = "";
+                let nowTime = new Date().getTime();
                 querySnapshot.forEach((docSnap) => {
                     const data = docSnap.data();
                     const logId = docSnap.id;
                     let isCanceled = data.status === "canceled";
+                    let isAdd = data.pointsObtained > 0;
+                    let isExpired = (!isCanceled && isAdd && data.expiredAt && (nowTime > new Date(data.expiredAt).getTime()));
+                    
                     let shortDate = data.obtainedAt ? new Date(data.obtainedAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}) : '';
 
+                    let badgeTxt = "";
+                    if (isCanceled) { badgeTxt = " (已註銷)"; }
+                    else if (isExpired) { badgeTxt = " (已過期)"; }
+
                     html += `
-                        <li style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; padding:4px 0; ${isCanceled ? 'text-decoration:line-through;color:#aaa;':''}">
+                        <li style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; padding:4px 0; ${(isCanceled || isExpired) ? 'text-decoration:line-through;color:#aaa;':''}">
                             <div>
                                 <strong>${data.pointsObtained > 0 ? '+':''}${data.pointsObtained}點</strong> 
-                                <span style="font-size:11px; color:#8a7377;">(${data.remark || '無'})</span>
+                                <span style="font-size:11px; color:${(isCanceled || isExpired) ? '#aaa' : '#8a7377'};">(${data.remark || '無'}${badgeTxt})</span>
                                 <span style="font-size:10px; color:#a18b8f; margin-left:4px;">${shortDate}</span>
                             </div>
-                            ${!isCanceled ? `<button class="cancel-point-btn" onclick="showCancelConfirmModal('${uid}', '${logId}', ${data.pointsObtained})">❌ 註銷</button>` : '<span>已註銷</span>'}
+                            ${(!isCanceled && !isExpired) ? `<button class="cancel-point-btn" onclick="showCancelConfirmModal('${uid}', '${logId}', ${data.pointsObtained})">❌ 註銷</button>` : `<span>${isCanceled ? '已註銷':'過期失效'}</span>`}
                         </li>`;
                 });
                 logListEl.innerHTML = html || "<li>該用戶尚無紀錄</li>";
             } catch (e) { logListEl.innerHTML = "<li>加載失敗</li>"; }
         };
 
+        // 2️⃣ 頁籤：載入全店獨立的「兌換券流水名冊」
+        async function loadAllCouponsMaster() {
+            const listEl = document.getElementById('boss-coupon-list');
+            listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>🌸 正在打包兌換券總冊...</div>";
+            try {
+                const querySnapshot = await getDocs(collection(db, "users"));
+                let html = "";
+                for (const userDoc of querySnapshot.docs) {
+                    const data = userDoc.data();
+                    const uid = userDoc.id;
+                    let displayName = data.lineName || '未命名';
+                    if (data.remarkName) { displayName += ` (${data.remarkName})`; }
+                    
+                    // 抓取每個會員的錢包
+                    const walletSnapshot = await getDocs(collection(db, "users", uid, "coupon_wallet"));
+                    let activeCount = 0;
+                    walletSnapshot.forEach(d => { if(d.data().status === 'unused') activeCount++; });
+
+                    html += `
+                        <div class="customer-item" style="border-left: 4px solid #8a7377;">
+                            <div class="customer-info-row" onclick="toggleCustomerCoupons('${uid}')">
+                                <span>🎫 ${displayName}</span>
+                                <span class="badge-points" style="background:#fff3f5; color:#8a7377;">未使用: ${activeCount} 張</span>
+                            </div>
+                            <div id="coupons-box-${uid}" class="customer-details-box">
+                                <ul id="coupon-log-list-${uid}" class="boss-log-list"><li>券口袋載入中...</li></ul>
+                            </div>
+                        </div>`;
+                }
+                listEl.innerHTML = html || "<p>尚無會員建立兌換券檔案</p>";
+            } catch(e) { listEl.innerHTML = "<p>兌換券總冊載入失敗</p>"; }
+        }
+
+        // 🔍 點開券名冊：列出客人的每張券（含過期判定、時間標示）
+        window.toggleCustomerCoupons = async function(uid) {
+            const box = document.getElementById(`coupons-box-${uid}`);
+            box.style.display = box.style.display === "block" ? "none" : "block";
+            if (box.style.display !== "block") return;
+
+            const listEl = document.getElementById(`coupon-log-list-${uid}`);
+            try {
+                const walletSnapshot = await getDocs(collection(db, "users", uid, "coupon_wallet"));
+                let html = "";
+                let nowTime = new Date().getTime();
+                
+                walletSnapshot.forEach(docSnap => {
+                    const c = docSnap.data();
+                    let isExpired = (c.status === "unused" && c.expiredAt && (nowTime > new Date(c.expiredAt).getTime()));
+                    
+                    let statusTxt = "";
+                    let statusColor = "";
+                    if (c.status === "used") { statusTxt = "已使用"; statusColor = "#8a7377"; }
+                    else if (isExpired) { statusTxt = "已過期"; statusColor = "#aaa"; }
+                    else { statusTxt = "未使用"; statusColor = "#c97288"; }
+
+                    let exDate = c.exchangedAt ? new Date(c.exchangedAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}) : '';
+
+                    html += `
+                        <li style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; padding:3px 0; ${(c.status==='used'||isExpired)?'color:#aaa;':''}">
+                            <div>
+                                <strong>🎀 ${c.name}</strong>
+                                <span style="font-size:10px; color:#a18b8f; margin-left:4px;">${exDate} 兌換</span>
+                            </div>
+                            <span style="font-size:12px; color:${statusColor}; font-weight:bold;">【${statusTxt}】</span>
+                        </li>`;
+                });
+                listEl.innerHTML = html || "<li>目前口袋內沒有任何兌換券</li>";
+            } catch(e) { listEl.innerHTML = "<li>加載券明細失敗</li>"; }
+        };
+
+        // 3️⃣ 頁籤：加載即將過期清單 (21天內)
         async function loadExpiryRemindersList() {
             const box = document.getElementById('boss-reminder-list');
             box.innerHTML = "<div style='text-align:center; padding:15px; color:#a18b8f;'>🌸 正在深度慢速撈取...</div>";
@@ -663,9 +700,7 @@
                     const uData = userDoc.data();
                     const uid = userDoc.id;
                     let userName = uData.lineName || '貴賓';
-                    if (uData.remarkName) {
-                        userName += ` (${uData.remarkName})`;
-                    }
+                    if (uData.remarkName) { userName += ` (${uData.remarkName})`; }
 
                     const pSnapshot = await getDocs(collection(db, "users", uid, "point_log"));
                     pSnapshot.forEach(pDoc => {
@@ -740,6 +775,7 @@
             }
         }
 
+        // 4️⃣ 頁籤：上架中心架上盤點
         async function loadBossCouponsMaster() {
             const box = document.getElementById('boss-coupons-master-list');
             box.innerHTML = "<div style='color:#a18b8f; font-size:12px;'>商品架盤點中...</div>";
@@ -772,9 +808,7 @@
 
         window.toggleBossCouponNote = function(cid) {
             const targetEl = document.getElementById(`boss-note-${cid}`);
-            if(targetEl) {
-                targetEl.style.display = targetEl.style.display === "block" ? "none" : "block";
-            }
+            if(targetEl) { targetEl.style.display = targetEl.style.display === "block" ? "none" : "block"; }
         };
 
         window.executeAddNewCoupon = async function() {
@@ -788,11 +822,7 @@
 
             try {
                 await addDoc(collection(db, "coupons"), {
-                    name: name,
-                    cost: cost,
-                    validDays: validDays, 
-                    note: note, 
-                    createdAt: new Date().toISOString()
+                    name: name, cost: cost, validDays: validDays, note: note, createdAt: new Date().toISOString()
                 });
                 showCustomAlert(`✨ 成功上架【${name}】！`);
                 document.getElementById('coupon-name-input').value = "";
@@ -809,9 +839,7 @@
             document.getElementById('unpublish-coupon-msg').innerText = `確定要下架【 ${name} 】嗎？`;
             document.getElementById('unpublish-coupon-overlay').style.display = "flex";
         };
-        window.closeUnpublishCouponModal = function() {
-            document.getElementById('unpublish-coupon-overlay').style.display = "none";
-        };
+        window.closeUnpublishCouponModal = function() { document.getElementById('unpublish-coupon-overlay').style.display = "none"; };
         window.executeUnpublishCoupon = async function() {
             if (!pendingCouponId) return;
             closeUnpublishCouponModal();
@@ -827,7 +855,6 @@
             document.getElementById('cancel-confirm-overlay').style.display = "flex";
         };
         window.closeCancelConfirmModal = function() { document.getElementById('cancel-confirm-overlay').style.display = "none"; };
-        
         window.executeCancelPoint = async function() {
             closeCancelConfirmModal();
             try {
@@ -866,12 +893,10 @@
             document.getElementById('remark-name-input').value = currentRemark || "";
             document.getElementById('remark-name-overlay').style.display = "flex";
         };
-        
         window.closeRemarkModal = function() {
             document.getElementById('remark-name-overlay').style.display = "none";
             window.currentSelectedUserUidForRemark = "";
         };
-        
         window.executeSaveRemark = async function() {
             const targetUid = window.currentSelectedUserUidForRemark; 
             if (!targetUid || targetUid === "") { showCustomAlert("系統未選定目標會員"); return; }
@@ -882,9 +907,7 @@
                 await setDoc(userDocRef, { remarkName: newRemark }, { merge: true });
                 showCustomAlert("店家備註姓名已更新同步！");
                 loadAllCustomers();
-            } catch(e) { 
-                showCustomAlert("雲端修改失敗，請稍後再試。"); 
-            }
+            } catch(e) { showCustomAlert("雲端修改失敗，請稍後再試。"); }
         };
 
         window.confirmSubmit = async function() {
@@ -896,17 +919,10 @@
                 const configDocRef = doc(db, "system_config", "admin_settings");
                 const configSnap = await getDoc(configDocRef);
                 let targetStaffPassword = configSnap.exists() ? configSnap.data().staffPassword : "0000";
-
-                if (document.getElementById('staff-pass').value !== targetStaffPassword) { 
-                    showCustomAlert("管理密碼錯誤！"); 
-                    return; 
-                }
+                if (document.getElementById('staff-pass').value !== targetStaffPassword) { showCustomAlert("管理密碼錯誤！"); return; }
             } catch(e) {
                 let inputPass = document.getElementById('staff-pass').value;
-                if (inputPass !== "0412" && inputPass !== "0000") {
-                    showCustomAlert("密碼錯誤且無法連線至雲端資料庫。");
-                    return;
-                }
+                if (inputPass !== "0412" && inputPass !== "0000") { showCustomAlert("密碼錯誤且無法連線。"); return; }
             }
 
             let finalRemark = "";
@@ -931,7 +947,6 @@
                 const userDocSnap = await getDoc(userDocRef);
                 let currentPoints = userDocSnap.exists() ? (userDocSnap.data().totalPoints || 0) : 0;
                 let newPoints = currentPoints + pointsChange;
-
                 const now = new Date();
                 const logRef = collection(db, "users", targetUserId, "point_log");
 
@@ -942,15 +957,8 @@
                 } else {
                     await addDoc(logRef, { pointsObtained: pointsChange, obtainedAt: now.toISOString(), expiredAt: now.toISOString(), status: "deducted", remark: finalRemark });
                 }
-
                 await setDoc(userDocRef, { totalPoints: newPoints }, { merge: true });
-                
-                if (pointsChange > 0) {
-                    showCustomAlert("本次新增 " + pointsChange + " 點，目前餘額：" + newPoints);
-                } else {
-                    showCustomAlert("本次扣除 " + Math.abs(pointsChange) + " 點，目前餘額：" + newPoints);
-                }
-                
+                showCustomAlert(pointsChange > 0 ? "本次新增 " + pointsChange + " 點，餘額：" + newPoints : "本次扣除 " + Math.abs(pointsChange) + " 點，餘額：" + newPoints);
                 targetUserId = ""; 
                 document.getElementById('customer-name-display').innerText = "🌸 請掃描客戶QR code 🌸";
                 document.getElementById('points-input').value = "1";
@@ -959,11 +967,10 @@
             finally { submitBtn.disabled = false; submitBtn.innerText = "確定"; }
         };
 
-        function dataNameSafe(str) {
-            return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        }
+        function dataNameSafe(str) { return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
         window.loadAllCustomers = loadAllCustomers;
+        window.loadAllCouponsMaster = loadAllCouponsMaster;
         window.loadBossCouponsMaster = loadBossCouponsMaster;
         window.loadExpiryRemindersList = loadExpiryRemindersList;
         window.openRemarkModalDirect = openRemarkModalDirect;
@@ -1001,8 +1008,10 @@
         .bag-item-date { font-size: 10px; color: #a18b8f; margin-top: 2px; }
         .bag-use-btn { padding: 6px 12px; background: #c97288; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 11px; cursor: pointer; flex-shrink: 0; }
 
-        .boss-nav-tabs { display: flex; gap: 6px; width: 98%; max-width: 370px; margin: 0 auto 15px auto; justify-content: space-between; }
-        .boss-nav-tabs button { border: 1px solid #fcdce2; background: white; color: #8a7377; font-weight: bold; font-size: 12px; cursor: pointer; white-space: nowrap; }
+        /* ✨ 2+2 並排美化專用樣式 */
+        .boss-nav-tabs { display: flex; flex-direction: column; gap: 6px; width: 98%; max-width: 370px; margin: 0 auto 15px auto; }
+        .tab-row { display: flex; gap: 6px; justify-content: space-between; }
+        .boss-tab-btn { flex: 1; padding: 11px 2px; border-radius: 10px; border: 1px solid #fcdce2; background: white; color: #8a7377; font-weight: bold; font-size: 12px; cursor: pointer; white-space: nowrap; }
         .tab-active { background: #c97288 !important; color: white !important; border-color: #c97288 !important; }
 
         .factory-box { background: #fff5f6; padding: 15px; border-radius: 12px; border: 1px dashed #c97288; margin-top: 5px; text-align: left; }
@@ -1043,11 +1052,8 @@
         .modal-btn-cancel { flex: 1; background: #fff; color: #a18b8f; border: 1px solid #fcdce2; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
         .modal-btn-confirm { flex: 1; background: #ffeef0; color: #c97288; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
         .modal-btn-danger-confirm { flex: 1; background: #d9534f; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
-        .boss-tab-btn { flex: 1; padding: 10px 4px; border-radius: 10px; border: 1px solid #fcdce2; background: white; color: #8a7377; font-weight: bold; font-size: 12px; cursor: pointer; white-space: nowrap; }
         
         .boss-title-container { display: flex; justify-content: center; align-items: center; position: relative; max-width: 360px; margin: 0 auto; }
-        
-        /* 🗝️ 專屬奢華定位按鈕樣式 - 縮小微調版 */
         .gear-btn { position: absolute; right: 8px; background: none; border: none; font-size: 16px; cursor: pointer; transition: transform 0.2s; opacity: 0.85; }
         .gear-btn:hover { transform: scale(1.1); opacity: 1; }
     </style>
@@ -1144,14 +1150,24 @@
         </div>
         
         <div class="boss-nav-tabs">
-            <button id="tab-btn-cust" class="boss-tab-btn tab-active" onclick="switchBossTab('customer-list-page')">❤️ 會員名冊</button>
-            <button id="tab-btn-remind" class="boss-tab-btn" onclick="switchBossTab('reminder-list-page')">⏰ 提醒清單</button>
-            <button id="tab-btn-fac" class="boss-tab-btn" onclick="switchBossTab('coupon-factory-page')">🌸 優惠券上架</button>
+            <div class="tab-row">
+                <button id="tab-btn-cust" class="boss-tab-btn tab-active" onclick="switchBossTab('customer-list-page')">❤️ 點數記錄</button>
+                <button id="tab-btn-coup" class="boss-tab-btn" onclick="switchBossTab('coupon-list-page')">🎫 兌換券記錄</button>
+            </div>
+            <div class="tab-row" style="margin-top: 6px;">
+                <button id="tab-btn-remind" class="boss-tab-btn" onclick="switchBossTab('reminder-list-page')">⏰ 提醒清單</button>
+                <button id="tab-btn-fac" class="boss-tab-btn" onclick="switchBossTab('coupon-factory-page')">🌸 優惠券上架</button>
+            </div>
         </div>
 
         <div id="customer-list-page">
-            <button class="scan-btn" style="margin: 5px 0 15px 0; padding:10px; font-size:14px;" onclick="loadAllCustomers()">✨ 重新整理全店總冊</button>
+            <button class="scan-btn" style="margin: 5px 0 15px 0; padding:10px; font-size:14px;" onclick="loadAllCustomers()">✨ 重新整理</button>
             <div id="boss-customer-list" class="customer-list-container"></div>
+        </div>
+
+        <div id="coupon-list-page" style="display:none;">
+            <button class="scan-btn" style="margin: 5px 0 15px 0; padding:10px; font-size:14px; background-color:#fff3f5; color:#8a7377;" onclick="loadAllCouponsMaster()">✨ 重新整理</button>
+            <div id="boss-coupon-list" class="customer-list-container"></div>
         </div>
 
         <div id="reminder-list-page" style="display:none;">
