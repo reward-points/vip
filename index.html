@@ -19,7 +19,7 @@
             projectId: "line-loyalty-card",
             storageBucket: "line-loyalty-card.firebasestorage.app",
             messagingSenderId: "284106917293",
-            appId: "1:284106917293:web:2675c8c6dfe4d4d27e4d24"
+            appId: "1:284106917293:web:2675c8c6dfe4d4d24"
         };
         // =========================================================================
         // 🛑 【核心大腦控制區】 ➔ 下方所有程式碼已完全自動化，請放任它們自己運作
@@ -176,7 +176,7 @@
                         typeTxt = "已註銷作廢";
                         statusColor = "#aaa";
                     } else {
-                        typeTxt = log.type === "exchange" ? "💖 兌換" : "✅ 使用";
+                        typeTxt = log.type === "exchange" ? "🌸 兌換" : "✅ 使用";
                         statusColor = log.type === "exchange" ? "#c97288" : "#8a7377";
                     }
 
@@ -263,7 +263,6 @@
             }
         };
 
-        // 🎛️ 四大帳本分流切換大腦
         window.switchBossTab = function(pageId) {
             document.getElementById('customer-list-page').style.display = "none";
             document.getElementById('coupon-list-page').style.display = "none";
@@ -334,6 +333,44 @@
             }
         };
 
+        // 🛠️ 核心修復：綁定客戶端優惠券彈窗
+        window.openBagModal = function() {
+            const container = document.getElementById('bag-container');
+            container.innerHTML = "<div style='color:#a18b8f;'>🌸 正在翻開您的優惠券口袋...</div>";
+            document.getElementById('bag-overlay').style.display = "flex";
+            if (!currentLiffUserId) return;
+            getDocs(collection(db, "users", currentLiffUserId, "coupon_wallet")).then(userBagSnapshot => {
+                let activeCoupons = [];
+                userBagSnapshot.forEach(docSnap => {
+                    const wData = docSnap.data();
+                    if (wData.status === "unused" && (new Date() <= new Date(wData.expiredAt))) {
+                        activeCoupons.push({
+                            id: docSnap.id,
+                            name: wData.name,
+                            expiredAt: wData.expiredAt,
+                            expTime: new Date(wData.expiredAt).getTime()
+                        });
+                    }
+                });
+
+                activeCoupons.sort((a, b) => a.expTime - b.expTime);
+
+                let html = "";
+                activeCoupons.forEach(coupon => {
+                    html += `
+                        <div class="bag-item">
+                            <div style="text-align:left; max-width: 65%;">
+                                <div class="bag-item-title">🎀 ${coupon.name}</div>
+                                <div class="bag-item-date">🌸 有效期至: ${new Date(coupon.expiredAt).toLocaleDateString()}</div>
+                            </div>
+                            <button class="bag-use-btn" onclick="showUseCouponConfirmModal('${coupon.id}', '${dataNameSafe(coupon.name)}')">立即使用</button>
+                        </div>`;
+                });
+                container.innerHTML = html || "<div style='padding:30px; color:#a18b8f;'>您目前口袋空空，快去專區用點數兌換吧！</div>";
+            }).catch(e => { container.innerHTML = "<div style='color:red;'>口袋載入失敗</div>"; });
+        };
+        window.closeBagModal = function() { document.getElementById('bag-overlay').style.display = "none"; };
+
         window.changePoints = function(amount) {
             let input = document.getElementById('points-input');
             let current = parseInt(input.value) || 0;
@@ -341,18 +378,6 @@
             input.value = newVal;
             toggleFormFields(newVal);
         };
-
-        function toggleFormFields(val) {
-            if (val < 0) {
-                document.getElementById('remark-add-group').style.display = "none";
-                document.getElementById('remark-deduct-group').style.display = "block";
-                document.getElementById('expiry-group').style.display = "none";
-            } else {
-                document.getElementById('remark-add-group').style.display = "block";
-                document.getElementById('remark-deduct-group').style.display = "none";
-                document.getElementById('expiry-group').style.display = "block";
-            }
-        }
 
         window.setExpireDays = function(days) {
             if (days === 'custom') {
@@ -412,18 +437,6 @@
                 }
             } catch (e) { document.getElementById('customer-name-display').innerText = "讀取失敗"; }
         }
-
-        window.toggleAccordion = function(id) {
-            const el = document.getElementById(id);
-            const icon = document.getElementById(id + '-icon');
-            if (el.style.display === "block") {
-                el.style.display = "none";
-                icon.innerText = "➕";
-            } else {
-                el.style.display = "block";
-                icon.innerText = "➖";
-            }
-        };
 
         window.openShopModal = async function() {
             const grid = document.getElementById('shop-grid');
@@ -509,10 +522,9 @@
                     obtainedAt: now.toISOString(),
                     expiredAt: now.toISOString(),
                     status: "deducted",
-                    remark: `專專區兌換: ${cName}`
+                    remark: `專區兌換: ${cName}`
                 });
 
-                // ✨ 精密對帳核心：將兌換的優惠券寫入獨立的 coupon_wallet 以及歷史日誌中
                 await addDoc(collection(db, "users", currentLiffUserId, "coupon_wallet"), {
                     name: cName,
                     exchangedAt: now.toISOString(),
@@ -538,7 +550,54 @@
             finally { shopGrid.style.pointerEvents = "auto"; }
         };
 
-        // 1️⃣ 頁籤：載入全店點數名冊
+        window.showUseCouponConfirmModal = function(wid, cName) {
+            pendingUseWalletId = wid;
+            pendingUseCouponName = cName;
+            document.getElementById('use-coupon-confirm-msg').innerText = `立即使用【${cName}】嗎？\n請與店家核對，使用後此券將永久消失！`;
+            document.getElementById('use-coupon-confirm-overlay').style.display = "flex";
+        };
+        window.closeUseCouponConfirmModal = function() {
+            document.getElementById('use-coupon-confirm-overlay').style.display = "none";
+            pendingUseWalletId = "";
+            pendingUseCouponName = "";
+        };
+
+        window.executeUseCustomerCoupon = async function() {
+            if (!pendingUseWalletId || !currentLiffUserId) return;
+            const targetWid = pendingUseWalletId;
+            const targetName = pendingUseCouponName;
+            closeUseCouponConfirmModal();
+
+            try {
+                const cDocRef = doc(db, "users", currentLiffUserId, "coupon_wallet", targetWid);
+                await updateDoc(cDocRef, { status: "used" });
+
+                await addDoc(collection(db, "users", currentLiffUserId, "coupon_log"), {
+                    name: targetName,
+                    actionAt: new Date().toISOString(),
+                    type: "use",
+                    detail: "成功使用優惠券"
+                });
+
+                showCustomAlert(`✅【${targetName}】已成功使用！\n歡迎再度光臨！`);
+                loadCustomerCouponHistory(currentLiffUserId);
+                closeBagModal();
+            } catch(e) { showCustomAlert("操作失敗，請重試"); }
+        };
+
+        window.toggleAccordion = function(id) {
+            const el = document.getElementById(id);
+            const icon = document.getElementById(id + '-icon');
+            if (el.style.display === "block") {
+                el.style.display = "none";
+                icon.innerText = "➕";
+            } else {
+                el.style.display = "block";
+                icon.innerText = "➖";
+            }
+        };
+
+        // 1️⃣ 後台頁籤：點數名冊加載（換上高級人形符號 👤）
         async function loadAllCustomers() {
             const listEl = document.getElementById('boss-customer-list');
             listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>🌸 正在撈取會員總冊...</div>";
@@ -556,8 +615,8 @@
                     html += `
                         <div class="customer-item">
                             <div class="customer-info-row" onclick="toggleCustomerDetails('${uid}')">
-                                <span>🌸 ${displayName}</span>
-                                <span class="badge-points">${data.totalPoints || 0} 點</span>
+                                <span>👤 ${displayName}</span>
+                                <span class="badge-points">🌸 ${data.totalPoints || 0} 點</span>
                             </div>
                             <div id="details-${uid}" class="customer-details-box">
                                 <p style="font-size:10px;color:#a18b8f;margin:5px 0;word-break:break-all;">LINE ID: ${uid}</p>
@@ -574,7 +633,6 @@
             } catch (e) { listEl.innerHTML = "<p>載入失敗</p>"; }
         }
 
-        // 🔍 點開名冊：載入個人點數帳本（包含過期、註銷雙貼標＋微小字日期）
         window.toggleCustomerDetails = async function(uid) {
             const box = document.getElementById(`details-${uid}`);
             box.style.display = box.style.display === "block" ? "none" : "block";
@@ -602,7 +660,7 @@
                     html += `
                         <li style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; padding:4px 0; ${(isCanceled || isExpired) ? 'text-decoration:line-through;color:#aaa;':''}">
                             <div>
-                                <strong>${data.pointsObtained > 0 ? '+':''}${data.pointsObtained}點</strong> 
+                                <strong>🌸 ${data.pointsObtained > 0 ? '+':''}${data.pointsObtained}點</strong> 
                                 <span style="font-size:11px; color:${(isCanceled || isExpired) ? '#aaa' : '#8a7377'};">(${data.remark || '無'}${badgeTxt})</span>
                                 <span style="font-size:10px; color:#a18b8f; margin-left:4px;">${shortDate}</span>
                             </div>
@@ -613,10 +671,10 @@
             } catch (e) { logListEl.innerHTML = "<li>加載失敗</li>"; }
         };
 
-        // 2️⃣ 頁籤：載入全店獨立的「兌換券流水名冊」
+        // 2️⃣ 後台頁籤：優惠券記錄加載（風格完完全全比照點數記錄，完美對齊！）
         async function loadAllCouponsMaster() {
             const listEl = document.getElementById('boss-coupon-list');
-            listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>🌸 正在打包兌換券總冊...</div>";
+            listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>🌸 正在打包優惠券總冊...</div>";
             try {
                 const querySnapshot = await getDocs(collection(db, "users"));
                 let html = "";
@@ -624,29 +682,28 @@
                     const data = userDoc.data();
                     const uid = userDoc.id;
                     let displayName = data.lineName || '未命名';
-                    if (data.remarkName) { displayName += ` (${data.remarkName})`; }
+                    if (data.remarkName) { displayName += ` <span style='color:#c97288; font-size:12px; font-weight:bold;'>(${data.remarkName})</span>`; }
                     
-                    // 抓取每個會員的錢包
                     const walletSnapshot = await getDocs(collection(db, "users", uid, "coupon_wallet"));
                     let activeCount = 0;
                     walletSnapshot.forEach(d => { if(d.data().status === 'unused') activeCount++; });
 
                     html += `
-                        <div class="customer-item" style="border-left: 4px solid #8a7377;">
+                        <div class="customer-item">
                             <div class="customer-info-row" onclick="toggleCustomerCoupons('${uid}')">
-                                <span>🎫 ${displayName}</span>
-                                <span class="badge-points" style="background:#fff3f5; color:#8a7377;">未使用: ${activeCount} 張</span>
+                                <span>👤 ${displayName}</span>
+                                <span class="badge-points" style="background:#fff3f5; color:#8a7377;">🎀 未使用: ${activeCount} 張</span>
                             </div>
                             <div id="coupons-box-${uid}" class="customer-details-box">
-                                <ul id="coupon-log-list-${uid}" class="boss-log-list"><li>券口袋載入中...</li></ul>
+                                <p style="font-size:10px;color:#a18b8f;margin:5px 0;word-break:break-all;">LINE ID: ${uid}</p>
+                                <ul id="coupon-log-list-${uid}" class="boss-log-list"><li>口袋明細載入中...</li></ul>
                             </div>
                         </div>`;
                 }
-                listEl.innerHTML = html || "<p>尚無會員建立兌換券檔案</p>";
-            } catch(e) { listEl.innerHTML = "<p>兌換券總冊載入失敗</p>"; }
+                listEl.innerHTML = html || "<p>尚無會員建立優惠券檔案</p>";
+            } catch(e) { listEl.innerHTML = "<p>優惠券總冊載入失敗</p>"; }
         }
 
-        // 🔍 點開券名冊：列出客人的每張券（含過期判定、時間標示）
         window.toggleCustomerCoupons = async function(uid) {
             const box = document.getElementById(`coupons-box-${uid}`);
             box.style.display = box.style.display === "block" ? "none" : "block";
@@ -671,7 +728,7 @@
                     let exDate = c.exchangedAt ? new Date(c.exchangedAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}) : '';
 
                     html += `
-                        <li style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; padding:3px 0; ${(c.status==='used'||isExpired)?'color:#aaa;':''}">
+                        <li style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; padding:4px 0; ${(c.status==='used'||isExpired)?'color:#aaa;':''}">
                             <div>
                                 <strong>🎀 ${c.name}</strong>
                                 <span style="font-size:10px; color:#a18b8f; margin-left:4px;">${exDate} 兌換</span>
@@ -679,11 +736,11 @@
                             <span style="font-size:12px; color:${statusColor}; font-weight:bold;">【${statusTxt}】</span>
                         </li>`;
                 });
-                listEl.innerHTML = html || "<li>目前口袋內沒有任何兌換券</li>";
-            } catch(e) { listEl.innerHTML = "<li>加載券明細失敗</li>"; }
+                listEl.innerHTML = html || "<li>目前口袋內沒有任何優惠券</li>";
+            } catch(e) { listEl.innerHTML = "<li>加載優惠券明細失敗</li>"; }
         };
 
-        // 3️⃣ 頁籤：加載即將過期清單 (21天內)
+        // 3️⃣ 後台頁籤：即將過期清單
         async function loadExpiryRemindersList() {
             const box = document.getElementById('boss-reminder-list');
             box.innerHTML = "<div style='text-align:center; padding:15px; color:#a18b8f;'>🌸 正在深度慢速撈取...</div>";
@@ -715,7 +772,7 @@
                                         expTimestamp: expTime,
                                         userName: userName,
                                         projectLabel: "點數過期",
-                                        badgeText: `⚠️ 有【 ${p.pointsObtained} 點 】點數`,
+                                        badgeText: `⚠️ 有【 ${p.pointsObtained} 點 】🌸`,
                                         dateStr: new Date(p.expiredAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}),
                                         daysLeft: daysLeft,
                                         borderStyle: "border-left: 4px solid #c97288; background:#fffdfd;"
@@ -737,7 +794,7 @@
                                         type: "coupon",
                                         expTimestamp: expTime,
                                         userName: userName,
-                                        projectLabel: "兌換券過期",
+                                        projectLabel: "優惠券過期",
                                         badgeText: `🎀 【 ${c.name} 】1 張`,
                                         dateStr: new Date(c.expiredAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}),
                                         daysLeft: daysLeft,
@@ -757,7 +814,7 @@
                         <div class="customer-item" style="${item.borderStyle} margin-bottom:6px; padding:10px 12px;">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <div>
-                                    <strong style="color:#5c4d50; font-size:14px;">🌸 ${item.userName}</strong>
+                                    <strong style="color:#5c4d50; font-size:14px;">👤 ${item.userName}</strong>
                                     <div style="font-size:12px; color:#c97288; font-weight:bold; margin-top:2px;">${item.projectLabel}</div>
                                 </div>
                                 <div style="text-align:right;">
@@ -768,14 +825,14 @@
                         </div>`;
                 });
 
-                box.innerHTML = html || "<div style='text-align:center; padding:30px; color:#a18b8f; font-size:13px;'>📅 盤點完畢！<br>未來 21 天之內，沒有任何客戶的點數或券到期。</div>";
+                box.innerHTML = html || "<div style='text-align:center; padding:30px; color:#a18b8f; font-size:13px;'>📅 盤點完畢！<br>未來 21 天之內，沒有任何客戶的點數或優惠券到期。</div>";
                 
             } catch (e) {
                 box.innerHTML = "<div style='color:red; text-align:center;'>清單讀取失敗，請重試。</div>";
             }
         }
 
-        // 4️⃣ 頁籤：上架中心架上盤點
+        // 4️⃣ 後台頁籤：優惠券上架中心
         async function loadBossCouponsMaster() {
             const box = document.getElementById('boss-coupons-master-list');
             box.innerHTML = "<div style='color:#a18b8f; font-size:12px;'>商品架盤點中...</div>";
@@ -795,7 +852,7 @@
                             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:#fffdfd; cursor:pointer;" onclick="toggleBossCouponNote('${cid}')">
                                 <div style="text-align:left; font-size:13px; max-width:70%;">
                                     <strong style="color:#6e5b5e;">🎀 ${cData.name}</strong><br>
-                                    <small style="color:#c97288;">兌換點數: ${cData.cost !== undefined ? cData.cost : 0} 點 | 效期: ${daysLimit} 天</small>
+                                    <small style="color:#c97288;">兌換點數: 🌸 ${cData.cost !== undefined ? cData.cost : 0} 點 | 效期: ${daysLimit} 天</small>
                                 </div>
                                 <button class="cancel-point-btn" style="margin-left:5px;" onclick="event.stopPropagation(); showUnpublishCouponModal('${cid}', '${dataNameSafe(cData.name)}')">❌ 下架</button>
                             </div>
@@ -930,7 +987,7 @@
                 if (document.getElementById('rb-deduct-custom').checked) {
                     finalRemark = document.getElementById('custom-remark-deduct-box').value.trim();
                 } else if (document.getElementById('rb-deduct-1').checked) {
-                    finalRemark = "兌換券";
+                    finalRemark = "優惠券";
                 } else if (document.getElementById('rb-deduct-2').checked) {
                     finalRemark = "誤發扣除";
                 }
@@ -977,6 +1034,7 @@
         window.openPasswordSettingsModal = openPasswordSettingsModal;
         window.closePasswordSettingsModal = closePasswordSettingsModal;
         window.executeSaveNewPasswords = executeSaveNewPasswords;
+        window.openBagModal = openBagModal; // 👈 確保函式開口完全向全域暴露開通
     </script>
 
     <style>
@@ -1008,7 +1066,6 @@
         .bag-item-date { font-size: 10px; color: #a18b8f; margin-top: 2px; }
         .bag-use-btn { padding: 6px 12px; background: #c97288; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 11px; cursor: pointer; flex-shrink: 0; }
 
-        /* ✨ 2+2 並排美化專用樣式 */
         .boss-nav-tabs { display: flex; flex-direction: column; gap: 6px; width: 98%; max-width: 370px; margin: 0 auto 15px auto; }
         .tab-row { display: flex; gap: 6px; justify-content: space-between; }
         .boss-tab-btn { flex: 1; padding: 11px 2px; border-radius: 10px; border: 1px solid #fcdce2; background: white; color: #8a7377; font-weight: bold; font-size: 12px; cursor: pointer; white-space: nowrap; }
@@ -1126,7 +1183,7 @@
             <div id="remark-deduct-group" style="margin: 15px 0; display:none;">
                 <label style="font-weight:bold; display:block; margin-bottom: 5px;">扣除原因(必選)：</label>
                 <div class="radio-group">
-                    <label class="radio-btn"><input type="radio" id="rb-deduct-1" name="deduct_remark" onclick="setDeductRemark('兌換券')" checked>兌換券</label>
+                    <label class="radio-btn"><input type="radio" id="rb-deduct-1" name="deduct_remark" onclick="setDeductRemark('優惠券')" checked>優惠券</label>
                     <label class="radio-btn"><input type="radio" id="rb-deduct-2" name="deduct_remark" onclick="setDeductRemark('誤發扣除')">誤發扣除</label>
                     <label class="radio-btn"><input type="radio" id="rb-deduct-custom" name="deduct_remark" onclick="setDeductRemark('custom')">手動輸入</label>
                 </div>
@@ -1152,7 +1209,7 @@
         <div class="boss-nav-tabs">
             <div class="tab-row">
                 <button id="tab-btn-cust" class="boss-tab-btn tab-active" onclick="switchBossTab('customer-list-page')">❤️ 點數記錄</button>
-                <button id="tab-btn-coup" class="boss-tab-btn" onclick="switchBossTab('coupon-list-page')">🎫 兌換券記錄</button>
+                <button id="tab-btn-coup" class="boss-tab-btn" onclick="switchBossTab('coupon-list-page')">🎫 優惠券記錄</button>
             </div>
             <div class="tab-row" style="margin-top: 6px;">
                 <button id="tab-btn-remind" class="boss-tab-btn" onclick="switchBossTab('reminder-list-page')">⏰ 提醒清單</button>
@@ -1203,7 +1260,7 @@
 
                 <button class="submit-btn" style="margin:0; padding:10px;" onclick="executeAddNewCoupon()">✨ 立即上架</button>
                 
-                <h4 style="font-size:13px; color:#8a7377; margin:18px 0 8px 0;">📋 已上架兌換券：</h4>
+                <h4 style="font-size:13px; color:#8a7377; margin:18px 0 8px 0;">📋 已上架優惠券：</h4>
                 <div id="boss-coupons-master-list"></div>
             </div>
         </div>
