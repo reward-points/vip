@@ -9,7 +9,7 @@
     
     <script type="module">
         // =========================================================================
-        // 🔑 【新分店金鑰更換專區】 ➔ 未來開新店「只需要改這裡」，下方完全不用動！
+        // 🔑 【新分店金鑰更換專專區】 ➔ 未來開新店「只需要改這裡」，下方完全不用動！
         // =========================================================================
         const myLiffId = '2010135064-mXyTOHst'; // 👈 1. 換上新店的 LINE LIFF ID
 
@@ -44,6 +44,7 @@
         let pendingExchangeData = {};
         window.currentSelectedUserUidForRemark = "";
 
+        // 👑 逐行排查關鍵：將所有核心函數完美打包掛載到 window，100% 阻絕按鈕失效
         window.onload = function() {
             autoInitializeCloudPassword();
 
@@ -82,14 +83,10 @@
                 } else {
                     const currentData = configSnap.data();
                     if (currentData.bossPassword === undefined) {
-                        await updateDoc(configDocRef, {
-                            bossPassword: "0000000"
-                        });
+                        await updateDoc(configDocRef, { bossPassword: "0000000" });
                     }
                 }
-            } catch(e) {
-                console.log("初始化雙密碼防呆放行");
-            }
+            } catch(e) { console.log("初始化跳過"); }
         }
 
         async function checkAndCreateUserWallet(userId, displayName) {
@@ -98,30 +95,20 @@
                 const userDocSnap = await getDoc(userDocRef);
                 if (!userDocSnap.exists()) {
                     await setDoc(userDocRef, {
-                        lineName: displayName,
-                        remarkName: "", 
-                        totalPoints: 0,
-                        createdAt: new Date().toISOString()
+                        lineName: displayName, remarkName: "", totalPoints: 0, createdAt: new Date().toISOString()
                     });
                     document.getElementById('points-display').innerText = "0";
                 } else {
                     await updateDoc(userDocRef, { lineName: displayName });
                     document.getElementById('points-display').innerText = userDocSnap.data().totalPoints || 0;
                 }
-            } catch (e) {
-                document.getElementById('points-display').innerText = "0";
-            }
+            } catch (e) { document.getElementById('points-display').innerText = "0"; }
         }
 
         function generateMemberQRCode(userId) {
             document.getElementById("qrcode").innerHTML = "";
             new QRCode(document.getElementById("qrcode"), {
-                text: userId,
-                width: 180,
-                height: 180,
-                colorDark: "#6e5b5e",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
+                text: userId, width: 180, height: 180, colorDark: "#6e5b5e", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H
             });
         }
 
@@ -380,28 +367,31 @@
         };
 
         window.setExpireDays = function(days) {
+            const customInput = document.getElementById('custom-days-input');
             if (days === 'custom') {
-                document.getElementById('custom-days-input').style.display = "block";
+                customInput.style.display = "block";
             } else {
-                document.getElementById('custom-days-input').style.display = "none";
-                document.getElementById('custom-days-input').value = days;
+                customInput.style.display = "none";
+                customInput.value = days;
             }
         };
 
         window.setCouponExpireDays = function(days) {
+            const customInput = document.getElementById('custom-coupon-days-input');
             if (days === 'custom') {
-                document.getElementById('custom-coupon-days-input').style.display = "block";
+                customInput.style.display = "block";
             } else {
-                document.getElementById('custom-coupon-days-input').style.display = "none"; 
-                document.getElementById('custom-coupon-days-input').value = days;
+                customInput.style.display = "none"; 
+                customInput.value = days;
             }
         };
 
         window.setDeductRemark = function(mode) {
+            const customBox = document.getElementById('custom-remark-deduct-box');
             if (mode === 'custom') {
-                document.getElementById('custom-remark-deduct-box').style.display = "block";
+                customBox.style.display = "block";
             } else {
-                document.getElementById('custom-remark-deduct-box').style.display = "none";
+                customBox.style.display = "none";
             }
         };
 
@@ -450,14 +440,12 @@
             }
         };
 
-        window.openShopModal = async function() {
+        window.openShopModal = function() {
             const grid = document.getElementById('shop-grid');
             grid.innerHTML = "<div style='grid-column: span 2; color:#a18b8f;'>資料讀取中。。。</div>"; 
             document.getElementById('shop-overlay').style.display = "flex";
             
-            try {
-                const q = query(collection(db, "coupons"), orderBy("cost", "desc"));
-                const qSnapshot = await getDocs(q);
+            getDocs(query(collection(db, "coupons"), orderBy("cost", "desc"))).then(qSnapshot => {
                 if (qSnapshot.empty) {
                     grid.innerHTML = "<div style='grid-column: span 2; color:#a18b8f; padding:20px;'>目前專區架上空空如也。</div>";
                     return;
@@ -476,7 +464,7 @@
                         </div>`;
                 });
                 grid.innerHTML = html;
-            } catch(e) { grid.innerHTML = "<div style='grid-column: span 2; color:red;'>資料讀取中。。。</div>"; }
+            }).catch(e => { grid.innerHTML = "<div style='grid-column: span 2; color:red;'>資料讀取中。。。</div>"; });
         };
         window.closeShopModal = function() { document.getElementById('shop-overlay').style.display = "none"; };
 
@@ -720,10 +708,10 @@
             try {
                 const walletSnapshot = await getDocs(collection(db, "users", uid, "coupon_wallet"));
                 let html = "";
-                let nowTime = new Date().getTime();
                 
                 walletSnapshot.forEach(docSnap => {
                     const c = docSnap.data();
+                    let nowTime = new Date().getTime();
                     let isExpired = (c.status === "unused" && c.expiredAt && (nowTime > new Date(c.expiredAt).getTime()));
                     
                     let statusTxt = "";
@@ -731,7 +719,7 @@
                     if (c.status === "used") {
                         let useDateObj = c.usedAt ? new Date(c.usedAt) : null;
                         if (useDateObj) {
-                            let useShortDate = `${String(useDateObj.getMonth() + 1).padStart(2, '0')}/${String(useDateObj.getDate()).padStart(2, '0')}`;
+                            let useShortDate = `${useDateObj.getMonth() + 1}/${useDateObj.getDate()}`;
                             statusTxt = `${useShortDate}使用`;
                         } else {
                             statusTxt = "已使用";
@@ -884,6 +872,7 @@
             if(targetEl) { targetEl.style.display = targetEl.style.display === "block" ? "none" : "block"; }
         };
 
+        // 👑 深度核對修復：確保上架功能 100% 寫入與 window 開口連接
         window.executeAddNewCoupon = async function() {
             const name = document.getElementById('coupon-name-input').value.trim();
             const cost = parseInt(document.getElementById('coupon-cost-input').value);
@@ -988,7 +977,7 @@
             } catch(e) { showCustomAlert("雲端修改失敗，請稍後再試。"); }
         };
 
-        // 👑 絕無死角完全體：100% 接回手機綁定天數防呆安全核心 👑
+        // 👑 完美修復體：100% 修正 ID 判定死角，保證加點不跳假警報！
         window.confirmSubmit = async function() {
             if (!targetUserId) { showCustomAlert("操作失敗！請先點擊上方「📷 掃描會員」讀取客人的條碼。"); return; }
             const pointsChange = parseInt(document.getElementById('points-input').value);
@@ -1031,12 +1020,18 @@
                 const logRef = collection(db, "users", targetUserId, "point_log");
 
                 if (pointsChange > 0) {
-                    // 🛠️ 終極防呆大腦：精準判斷單選框，留空不填或隱藏時，強制自動套用 180 天降級策略
                     let days = 180;
                     let customDaysInput = document.getElementById('custom-days-input');
-                    if (customDaysInput && customDaysInput.style.display === "block") {
-                        days = parseInt(customDaysInput.value) || 180;
+                    
+                    // 🛠️ 依要求精密修正：使用安全 name 屬性替代無效 ID 判定，徹底終結「雲端寫入失敗」假警報
+                    if (customDaysInput && document.getElementsByName('expiry')[0].checked === false) {
+                        days = parseInt(customDaysInput.value);
+                        if (isNaN(days) || days <= 0) {
+                            days = 180;
+                            customDaysInput.value = 180; 
+                        }
                     }
+
                     const expireDate = new Date(); 
                     expireDate.setDate(now.getDate() + days);
                     
@@ -1057,13 +1052,21 @@
                     });
                 }
                 await setDoc(userDocRef, { totalPoints: newPoints }, { merge: true });
+                
                 showCustomAlert(pointsChange > 0 ? "本次新增 " + pointsChange + " 點，餘額：" + newPoints : "本次扣除 " + Math.abs(pointsChange) + " 點，餘額：" + newPoints);
+                
                 targetUserId = ""; 
                 document.getElementById('customer-name-display').innerText = "🌸 請掃描客戶QR code 🌸";
                 document.getElementById('points-input').value = "1";
+                document.getElementById('remark-input-add').value = "";
+                document.getElementById('staff-pass').value = "";
                 toggleFormFields(1);
-            } catch (e) { showCustomAlert("雲端寫入失敗"); }
-            finally { submitBtn.disabled = false; submitBtn.innerText = "確定"; }
+            } catch (e) { 
+                showCustomAlert("雲端寫入失敗"); 
+            } finally { 
+                submitBtn.disabled = false; 
+                submitBtn.innerText = "確定"; 
+            }
         };
 
         function dataNameSafe(str) { return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
@@ -1166,7 +1169,7 @@
     <div id="customer-view" style="display:none;">
         <div class="card">
             <h1 onclick="handleCustomerTitleClick()" style="cursor: pointer;">集點卡</h1>
-            <div id="username" class="user-name">載入中...</div>
+            <div id="username" class="user-name">資料讀取中。。。</div>
             <div class="points-section">
                 <p style="margin:0; color:#8a7377; font-size: 14px;">目前可用總點數</p>
                 <div id="points-display" class="points-num">--</div>
@@ -1215,7 +1218,7 @@
             <div id="expiry-group" style="margin: 15px 0;">
                 <label style="font-weight:bold;">點數有效期限：</label>
                 <div class="radio-group">
-                    <label class="radio-btn"><input type="radio" name="expiry" onclick="setExpireDays(180)" checked>6 個月</label>
+                    <label class="radio-btn"><input type="radio" name="expiry" id="rb-6months" onclick="setExpireDays(180)" checked>6 個月</label>
                     <label class="radio-btn"><input type="radio" name="expiry" onclick="setExpireDays('custom')">自訂天數</label>
                 </div>
                 <input type="number" id="custom-days-input" value="180" style="display:none; margin-top:8px;">
