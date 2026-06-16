@@ -80,6 +80,9 @@
         window.executeSaveRemark = executeSaveRemark;
         window.setDeductRemark = setDeductRemark;
         window.setCouponExpireDays = setCouponExpireDays;
+        window.showUseCouponConfirmModal = showUseCouponConfirmModal;
+        window.closeUseCouponConfirmModal = closeUseCouponConfirmModal;
+        window.executeUseCustomerCoupon = executeUseCustomerCoupon;
 
         window.onload = function() {
             liff.init({ liffId: myLiffId, withLoginOnExternalBrowser: true })
@@ -148,7 +151,6 @@
                     }
 
                     let rowStyle = (isCanceled || isExpired) ? 'style="text-decoration: line-through; color: #aaa;"' : '';
-                    
                     let statusSuffix = "";
                     if (isCanceled) {
                         statusSuffix = ' <span style="color: #ff4d4f; text-decoration: none; display: inline-block;">(已註銷)</span>';
@@ -667,10 +669,10 @@
             try {
                 const walletSnapshot = await getDocs(collection(db, "users", uid, "coupon_wallet"));
                 let html = "";
-                let nowTime = new Date().getTime();
                 
                 walletSnapshot.forEach(docSnap => {
                     const c = docSnap.data();
+                    let nowTime = new Date().getTime();
                     let isExpired = (c.status === "unused" && c.expiredAt && (nowTime > new Date(c.expiredAt).getTime()));
                     
                     let statusTxt = "";
@@ -1165,7 +1167,7 @@
 
     <div id="boss-view" style="display:none; background-color: #fffbfc; padding: 15px 5px;" class="card">
         <div class="boss-title-container">
-            <h2>高階後台系統<span class="version-stamp" style="position:absolute; right:35px; top:12px;">06161450</span></h2>
+            <h2>高階後台系統<span class="version-stamp" style="position:absolute; right:35px; top:12px;">06161510</span></h2>
             <button class="gear-btn" onclick="openPasswordSettingsModal()">🗝️</button>
         </div>
         
@@ -1229,6 +1231,7 @@
         </div>
     </div>
 
+    <!-- 彈窗群 -->
     <div id="shop-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">🌸 點數兌換專區</div><div class="modal-text" style="font-size:12px; margin-bottom:12px; color:#8a7377;">點擊下方商品即可扣點兌換</div><div id="shop-grid" class="shop-grid"></div><button class="modal-btn-cancel" style="width:100%; margin-top:15px;" onclick="closeShopModal()">關閉專區</button></div></div>
     <div id="bag-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">🎀 我的優惠券</div><div id="bag-container" class="bag-list"></div><button class="modal-btn-cancel" style="width:100%; margin-top:15px;" onclick="closeBagModal()">關閉口袋</button></div></div>
     <div id="custom-alert-overlay" class="custom-alert-overlay"><div class="custom-alert-box"><div id="alert-msg" class="custom-alert-text">提示訊息</div><button class="custom-alert-btn" onclick="closeCustomAlert()">確定</button></div></div>
@@ -1237,7 +1240,13 @@
     <div id="delete-member-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title" style="color: #d9534f;">🚨 永久刪除會員</div><div id="delete-member-msg" class="modal-text">確認刪除訊息</div><input type="text" id="delete-confirm-input" placeholder="請精準輸入 del" style="margin-top:8px; margin-bottom:5px;"><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeDeleteMemberModal()">取消</button><button class="modal-btn-danger-confirm" onclick="executeDeleteMember()">強行永久刪除</button></div></div></div>
     <div id="unpublish-coupon-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">❌ 下架商品確認</div><div id="unpublish-coupon-msg" class="modal-text"></div><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeUnpublishCouponModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeUnpublishCoupon()">確定下架</button></div></div></div>
     <div id="remark-name-overlay" class="modal-overlay"><div class="modal-box" style="border: 2px dashed #c97288;"><div id="remark-user-title" class="modal-title">修改店家備註姓名</div><div class="modal-text" style="font-size:12px; color:#8a7377;">此備註僅會顯示在店家後台，方便您識別客戶。</div><input type="text" id="remark-name-input" placeholder="例如：李小姐 (每週五固定)"><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeRemarkModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeSaveRemark()">儲存修改</button></div></div></div>
-    <div id="exchange-confirm-overlay" class="modal-overlay"><div class="modal-box" style="border: 2px solid #c97288; max-width:340px;"><div class="modal-title">💖 兌換商品確認</div><div id="exchange-confirm-msg" class="modal-text" style="font-size: 15px; padding: 2px 0; font-weight: bold; line-height: 1.4; margin-bottom:8px;">確認兌換訊息</div><div id="exchange-confirm-note-box" style="width:100%; box-sizing:border-box; margin-bottom:10px;"></div><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeExchangeConfirmModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeExchangeCoupon()">確定兌換</button></div></div></div>
+    <div id="exchange-confirm-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">💖 兌換商品確認</div><div id="exchange-confirm-msg" class="modal-text" style="font-size: 15px; padding: 2px 0; font-weight: bold; line-height: 1.4; margin-bottom:8px;">確認兌換訊息</div><div id="exchange-confirm-note-box" style="width:100%; box-sizing:border-box; margin-bottom:10px;"></div><div class="modal-btn-row" style="margin-top:15px;">
+                <button class="modal-btn-cancel" onclick="closeExchangeConfirmModal()">取消</button>
+                <button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeExchangeCoupon()">確定兌換</button>
+            </div></div></div>
+    
+    <!-- 👑 補齊最關鍵的失蹤連線：立即使用優惠券確認視窗 -->
+    <div id="use-coupon-confirm-overlay" class="modal-overlay"><div class="modal-box" style="border: 2px solid #8a7377;"><div class="modal-title" style="color:#8a7377;">✅ 確認使用優惠券</div><div id="use-coupon-confirm-msg" class="modal-text" style="font-size:14px; font-weight:bold; line-height:1.4;"></div><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeUseCouponConfirmModal()">取消</button><button class="modal-btn-confirm" style="background:#8a7377; color:white;" onclick="executeUseCustomerCoupon()">確定使用</button></div></div></div>
 
 </body>
 </html>
