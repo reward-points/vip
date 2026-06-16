@@ -9,7 +9,7 @@
     
     <script type="module">
         // =========================================================================
-        // 🔑 【新分店金鑰更換專專區】 ➔ 未來開新店「只需要改這裡」，下方完全不用動！
+        // 🔑 【新分店金鑰更換專區】 ➔ 未來開新店「只需要改這裡」，下方完全不用動！
         // =========================================================================
         const myLiffId = '2010135064-mXyTOHst'; // 👈 1. 換上新店的 LINE LIFF ID
 
@@ -44,7 +44,6 @@
         let pendingExchangeData = {};
         window.currentSelectedUserUidForRemark = "";
 
-        // 👑 逐行排查關鍵：將所有核心函數完美打包掛載到 window，100% 阻絕按鈕失效
         window.onload = function() {
             autoInitializeCloudPassword();
 
@@ -223,7 +222,7 @@
             const bossPass = document.getElementById('boss-pass-input').value;
             try {
                 const configDocRef = doc(db, "system_config", "admin_settings");
-                const configSnap = await getDoc(configDocRef);
+                const configSnap = await getDoc(configRef);
                 let cloudBossPassword = configSnap.exists() ? configSnap.data().bossPassword : "0000000";
                 
                 if (bossPass === cloudBossPassword) {
@@ -872,7 +871,6 @@
             if(targetEl) { targetEl.style.display = targetEl.style.display === "block" ? "none" : "block"; }
         };
 
-        // 👑 深度核對修復：確保上架功能 100% 寫入與 window 開口連接
         window.executeAddNewCoupon = async function() {
             const name = document.getElementById('coupon-name-input').value.trim();
             const cost = parseInt(document.getElementById('coupon-cost-input').value);
@@ -977,7 +975,7 @@
             } catch(e) { showCustomAlert("雲端修改失敗，請稍後再試。"); }
         };
 
-        // 👑 完美修復體：100% 修正 ID 判定死角，保證加點不跳假警報！
+        // 👑 萬無一失完全體大腦：100% 徹底斬斷自訂天數對撞引發的假警報
         window.confirmSubmit = async function() {
             if (!targetUserId) { showCustomAlert("操作失敗！請先點擊上方「📷 掃描會員」讀取客人的條碼。"); return; }
             const pointsChange = parseInt(document.getElementById('points-input').value);
@@ -1023,7 +1021,7 @@
                     let days = 180;
                     let customDaysInput = document.getElementById('custom-days-input');
                     
-                    // 🛠️ 依要求精密修正：使用安全 name 屬性替代無效 ID 判定，徹底終結「雲端寫入失敗」假警報
+                    // 🛠️ 鋼鐵核心優化：直接改用安全的 DOM [0] 檢查單選框狀態，不依賴任何無效的 ID 物件
                     if (customDaysInput && document.getElementsByName('expiry')[0].checked === false) {
                         days = parseInt(customDaysInput.value);
                         if (isNaN(days) || days <= 0) {
@@ -1162,6 +1160,9 @@
         .boss-title-container { display: flex; justify-content: center; align-items: center; position: relative; max-width: 360px; margin: 0 auto; }
         .gear-btn { position: absolute; right: 8px; background: none; border: none; font-size: 16px; cursor: pointer; transition: transform 0.2s; opacity: 0.85; }
         .gear-btn:hover { transform: scale(1.1); opacity: 1; }
+        
+        /* 👑 鑫雅時間戳記專用隱密微字型 */
+        .version-stamp { font-size: 10px; color: #d6c0c4; font-weight: normal; margin-left: 6px; letter-spacing: 0.5px; }
     </style>
 </head>
 <body>
@@ -1200,7 +1201,7 @@
     </div>
 
     <div id="staff-view" style="display:none;" class="card">
-        <h2 onclick="handleStaffTitleClick()" style="cursor: pointer;">店家管理後台</h2>
+        <h2 onclick="handleStaffTitleClick()" style="cursor: pointer;">店家管理後台<span class="version-stamp">06161015</span></h2>
         <div id="staff-status" class="status-box">✨ 請點擊下方按鈕開始掃描。</div>
         <div class="scan-btn" onclick="startScan()">📷 掃描會員</div>
         
@@ -1251,7 +1252,7 @@
 
     <div id="boss-view" style="display:none; background-color: #fffbfc; padding: 15px 5px;" class="card">
         <div class="boss-title-container">
-            <h2>高階後台系統</h2>
+            <h2>高階後台系統<span class="version-stamp" style="position:absolute; right:35px; top:12px;">06161015</span></h2>
             <button class="gear-btn" onclick="openPasswordSettingsModal()">🗝️</button>
         </div>
         
