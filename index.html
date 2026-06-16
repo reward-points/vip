@@ -9,24 +9,18 @@
     
     <script type="module">
         // =========================================================================
-        // 🔑 【新分店金鑰更換專區】 ➔ 未來開新店「只需要改這裡」，下方完全不用動！
+        // 🔑 【分店金鑰與基本設定】 ➔ 開新店時修改此處
         // =========================================================================
-        const myLiffId = '2010135064-mXyTOHst'; // 👈 1. 換上新店的 LINE LIFF ID
+        const myLiffId = '2010135064-mXyTOHst'; 
 
         const firebaseConfig = {
-            apiKey: "AIzaSyAqsN1y3eNHtQ4PiYpWIuxZC8eN6o0bK24",             // 👈 2. 換上新店的 Firebase 憑證
+            apiKey: "AIzaSyAqsN1y3eNHtQ4PiYpWIuxZC8eN6o0bK24",             
             authDomain: "line-loyalty-card.firebaseapp.com",
             projectId: "line-loyalty-card",
             storageBucket: "line-loyalty-card.firebasestorage.app",
             messagingSenderId: "284106917293",
             appId: "1:284106917293:web:2675c8c6dfe4d4d24"
         };
-
-        // 🔒 【鑫雅分店密碼固化控制鎖】 ➔ 交接給新店家直接改這裡，秒速反應不卡雲端！
-        const FIXED_STAFF_PASSWORD = "0000";       // 👈 3. 新店家的 店員加減點密碼
-        const FIXED_BOSS_PASSWORD  = "00000000";   // 👈 4. 新店家的 Boss 高階密碼
-        // =========================================================================
-        // 🛑 【核心大腦控制區】 ➔ 下方所有程式碼已完全自動化，請放任它們自己運作
         // =========================================================================
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -201,19 +195,43 @@
             document.getElementById('boss-login-overlay').style.display = "none";
         };
 
-        // 👑 密碼大腦回歸最穩固放行線：直接核對固化控制鎖
+        // 👑 【高階後台解鎖大腦】 ➔ 100% 實時連線去讀妳 Firebase 設定的 00000000
         window.confirmBossLogin = async function() {
             const bossPass = document.getElementById('boss-pass-input').value;
-            if (bossPass === FIXED_BOSS_PASSWORD || bossPass === "0412888") {
-                closeBossLoginModal();
-                document.getElementById('customer-view').style.display = "none";
-                document.getElementById('staff-view').style.display = "none";
-                document.getElementById('boss-view').style.display = "block";
-                showCustomAlert("歡迎登入高階後台系統");
-                switchBossTab('customer-list-page');
-            } else {
-                closeBossLoginModal(); 
-                setTimeout(() => { showCustomAlert("密碼錯誤，請重新解鎖。"); }, 300); 
+            
+            try {
+                // 🎯 確實連線到 Firebase 的 system_config / passwords 去對帳！
+                const configDocRef = doc(db, "system_config", "passwords");
+                const configSnap = await getDoc(configDocRef);
+                
+                let cloudBossPass = "00000000"; // 預設防摔防線
+                if (configSnap.exists()) {
+                    cloudBossPass = configSnap.data().boss_password || "00000000";
+                }
+                
+                // 同時允許新改的雲端密碼，以及妳最熟悉的舊萬用密碼放行
+                if (bossPass === cloudBossPass || bossPass === "0412888") {
+                    closeBossLoginModal();
+                    document.getElementById('customer-view').style.display = "none";
+                    document.getElementById('staff-view').style.display = "none";
+                    document.getElementById('boss-view').style.display = "block";
+                    showCustomAlert("歡迎登入高階後台系統");
+                    switchBossTab('customer-list-page');
+                } else {
+                    closeBossLoginModal(); 
+                    setTimeout(() => { showCustomAlert("密碼錯誤，請重新輸入。"); }, 300); 
+                }
+            } catch (e) {
+                // 如果網路臨時斷開，啟用備用安全放行機制
+                if (bossPass === "00000000" || bossPass === "0412888") {
+                    closeBossLoginModal();
+                    document.getElementById('customer-view').style.display = "none";
+                    document.getElementById('staff-view').style.display = "none";
+                    document.getElementById('boss-view').style.display = "block";
+                } else {
+                    closeBossLoginModal();
+                    setTimeout(() => { showCustomAlert("驗證失敗，請檢查網路連線。"); }, 300);
+                }
             }
         };
 
@@ -247,9 +265,9 @@
             }
         };
 
-        // 👑 簡化齒輪設定：不再支援雲端修改密碼（防止覆蓋失效），直接提示在最頂端修改代碼
+        // ⚙️ 齒輪直連：點擊直接在畫面上引導去 Firebase 後台修改最安全
         window.openPasswordSettingsModal = function() {
-            showCustomAlert("💡 提示：如需變更分店管理密碼，請直接修改網頁原始碼第 24-25 行的「固化控制鎖」即可！");
+            showCustomAlert("💡 提示：高階密碼與店員密碼，請直接前往 Firebase 網頁後台的「system_config ➔ passwords」資料夾中修改，網頁將會自動實時抓取最新設定！");
         };
         window.closePasswordSettingsModal = function() {};
         window.executeSaveNewPasswords = function() {};
@@ -295,6 +313,18 @@
             input.value = newVal;
             toggleFormFields(newVal);
         };
+
+        function toggleFormFields(val) {
+            if (val < 0) {
+                document.getElementById('remark-add-group').style.display = "none";
+                document.getElementById('remark-deduct-group').style.display = "block";
+                document.getElementById('expiry-group').style.display = "none";
+            } else {
+                document.getElementById('remark-add-group').style.display = "block";
+                document.getElementById('remark-deduct-group').style.display = "none";
+                document.getElementById('expiry-group').style.display = "block";
+            }
+        }
 
         window.setExpireDays = function(days) {
             const customInput = document.getElementById('custom-days-input');
@@ -501,7 +531,6 @@
             } catch(e) { showCustomAlert("操作失敗，請重試"); }
         };
 
-        // 1️⃣ 後台頁籤：點數記錄加載
         async function loadAllCustomers() {
             const listEl = document.getElementById('boss-customer-list');
             listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>資料讀取中。。。</div>"; 
@@ -583,7 +612,6 @@
             } catch (e) { logListEl.innerHTML = "<li>加載失敗</li>"; }
         };
 
-        // 2️⃣ 後台頁籤：優惠券記錄加載
         async function loadAllCouponsMaster() {
             const listEl = document.getElementById('boss-coupon-list');
             listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>資料讀取中。。。</div>"; 
@@ -659,7 +687,6 @@
             } catch(e) { listEl.innerHTML = "<li>加載優惠券明細失敗</li>"; }
         };
 
-        // 3️⃣ 後台頁籤：提醒清單加載
         async function loadExpiryRemindersList() {
             const box = document.getElementById('boss-reminder-list');
             box.innerHTML = "<div style='text-align:center; padding:15px; color:#a18b8f;'>資料讀取中。。。</div>"; 
@@ -731,7 +758,6 @@
             } catch (e) { box.innerHTML = "<div style='color:red; text-align:center;'>資料讀取中。。。</div>"; }
         }
 
-        // 4️⃣ 後台頁籤：優惠券上架中心
         async function loadBossCouponsMaster() {
             const box = document.getElementById('boss-coupons-master-list');
             box.innerHTML = "<div style='color:#a18b8f; font-size:12px;'>資料讀取中。。。</div>"; 
@@ -869,37 +895,48 @@
             } catch(e) { showCustomAlert("雲端修改失敗，請稍後再試。"); }
         };
 
-        // 👑 鑫雅商用最終體：100% 繞開雲端非同步死鎖，對齊固化密碼與安全機制
+        // 🔒 【店員加減點核心大腦】 ➔ 同步落實實時連線 Firebase 對帳！
         window.confirmSubmit = async function() {
             if (!targetUserId) { showCustomAlert("操作失敗！請先點擊上方「📷 掃描會員」讀取客人的條碼。"); return; }
             const pointsChange = parseInt(document.getElementById('points-input').value);
             if (pointsChange === 0) { showCustomAlert("點數不能為 0"); return; }
             
-            // 🔒 店員密碼驗證：直接鎖死 FIXED_STAFF_PASSWORD 進行最快速本地校對放行
             let inputPass = document.getElementById('staff-pass').value;
-            if (inputPass !== FIXED_STAFF_PASSWORD && inputPass !== "0412") {
-                showCustomAlert("管理密碼錯誤！");
-                return;
-            }
-
-            let finalRemark = "";
-            if (pointsChange < 0) {
-                if (document.getElementById('rb-deduct-custom').checked) {
-                    finalRemark = document.getElementById('custom-remark-deduct-box').value.trim();
-                } else if (document.getElementById('rb-deduct-1').checked) {
-                    finalRemark = "優惠券";
-                } else if (document.getElementById('rb-deduct-2').checked) {
-                    finalRemark = "誤發扣除";
-                }
-                if (!finalRemark) { showCustomAlert("扣點時必須填寫原因！"); return; }
-            } else {
-                finalRemark = document.getElementById('remark-input-add').value.trim() || "店家發放";
-            }
 
             const submitBtn = document.getElementById('staff-submit-btn');
-            submitBtn.disabled = true; submitBtn.innerText = "同步中...";
+            submitBtn.disabled = true; submitBtn.innerText = "驗證中...";
 
             try {
+                // 🎯 這裡修正：直接去 Firebase 撈出最新設定的 staff_password 欄位
+                const configDocRef = doc(db, "system_config", "passwords");
+                const configSnap = await getDoc(configDocRef);
+                
+                let cloudStaffPass = "0000"; // 預設值
+                if (configSnap.exists()) {
+                    cloudStaffPass = configSnap.data().staff_password || "0000";
+                }
+
+                // 核對輸入密碼是否符合雲端值，或是舊的備用密碼
+                if (inputPass !== cloudStaffPass && inputPass !== "0412") {
+                    showCustomAlert("管理密碼錯誤！");
+                    submitBtn.disabled = false; submitBtn.innerText = "確定"; 
+                    return;
+                }
+
+                let finalRemark = "";
+                if (pointsChange < 0) {
+                    if (document.getElementById('rb-deduct-custom').checked) {
+                        finalRemark = document.getElementById('custom-remark-deduct-box').value.trim();
+                    } else if (document.getElementById('rb-deduct-1').checked) {
+                        finalRemark = "優惠券";
+                    } else if (document.getElementById('rb-deduct-2').checked) {
+                        finalRemark = "誤發扣除";
+                    }
+                    if (!finalRemark) { showCustomAlert("扣點時必須填寫原因！"); submitBtn.disabled = false; submitBtn.innerText = "確定"; return; }
+                } else {
+                    finalRemark = document.getElementById('remark-input-add').value.trim() || "店家發放";
+                }
+
                 const userDocRef = doc(db, "users", targetUserId);
                 const userDocSnap = await getDoc(userDocRef);
                 let currentPoints = userDocSnap.exists() ? (userDocSnap.data().totalPoints || 0) : 0;
@@ -939,7 +976,7 @@
                 document.getElementById('staff-pass').value = "";
                 toggleFormFields(1);
             } catch (e) { 
-                showCustomAlert("雲端寫入失敗"); 
+                showCustomAlert("雲端寫入失敗，請確認 Firebase 設定。"); 
             } finally { 
                 submitBtn.disabled = false; submitBtn.innerText = "確定"; 
             }
@@ -957,6 +994,7 @@
         window.executeSaveNewPasswords = executeSaveNewPasswords;
         window.openBagModal = openBagModal; 
         window.openShopModal = openShopModal;
+        window.confirmSubmit = confirmSubmit;
     </script>
 
     <style>
@@ -1078,7 +1116,7 @@
     </div>
 
     <div id="staff-view" style="display:none;" class="card">
-        <h2 onclick="handleStaffTitleClick()" style="cursor: pointer;">店家管理後台<span class="version-stamp">06161130</span></h2>
+        <h2 onclick="handleStaffTitleClick()" style="cursor: pointer;">店家管理後台<span class="version-stamp">0616-V2</span></h2>
         <div id="staff-status" class="status-box">✨ 請點擊下方按鈕開始掃描。</div>
         <div class="scan-btn" onclick="startScan()">📷 掃描會員</div>
         
@@ -1129,7 +1167,7 @@
 
     <div id="boss-view" style="display:none; background-color: #fffbfc; padding: 15px 5px;" class="card">
         <div class="boss-title-container">
-            <h2>高階後台系統<span class="version-stamp" style="position:absolute; right:35px; top:12px;">06161130</span></h2>
+            <h2>高階後台系統<span class="version-stamp" style="position:absolute; right:35px; top:12px;">0616-V2</span></h2>
             <button class="gear-btn" onclick="openPasswordSettingsModal()">🗝️</button>
         </div>
         
@@ -1201,45 +1239,7 @@
     <div id="delete-member-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title" style="color: #d9534f;">🚨 永久刪除會員</div><div id="delete-member-msg" class="modal-text">確認刪除訊息</div><input type="text" id="delete-confirm-input" placeholder="請精準輸入 del" style="margin-top:8px; margin-bottom:5px;"><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeDeleteMemberModal()">取消</button><button class="modal-btn-danger-confirm" onclick="executeDeleteMember()">強行永久刪除</button></div></div></div>
     <div id="unpublish-coupon-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">❌ 下架商品確認</div><div id="unpublish-coupon-msg" class="modal-text"></div><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeUnpublishCouponModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeUnpublishCoupon()">確定下架</button></div></div></div>
     <div id="remark-name-overlay" class="modal-overlay"><div class="modal-box" style="border: 2px dashed #c97288;"><div id="remark-user-title" class="modal-title">修改店家備註姓名</div><div class="modal-text" style="font-size:12px; color:#8a7377;">此備註僅會顯示在店家後台，方便您識別客戶。</div><input type="text" id="remark-name-input" placeholder="例如：李小姐 (每週五固定)"><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeRemarkModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeSaveRemark()">儲存修改</button></div></div></div>
-
-    <div id="password-settings-overlay" class="modal-overlay">
-        <div class="modal-box" style="border: 2px solid #c97288; max-width:340px;">
-            <div class="modal-title">密碼修改</div>
-            <div class="modal-text" style="font-size:11px; color:#8a7377; line-height:1.4; margin-bottom:12px; text-align:left;">💡 留空不填代表「維持原密碼」不修改。</div>
-            
-            <div style="text-align:left; margin-bottom:10px;">
-                <label style="font-size:12px; font-weight:bold; color:#d9534f;">1. 輸入「目前」高階密碼 (必填)</label>
-                <input type="password" id="verify-current-boss-pass" placeholder="請輸入目前的高階密碼進行身分核對" style="margin-top:4px;">
-            </div>
-            
-            <div style="text-align:left; margin-bottom:10px; border-top:1px dashed #fcdce2; padding-top:8px;">
-                <label style="font-size:12px; font-weight:bold; color:#6e5b5e;">2. 設定「全新」店家密碼 (選填)</label>
-                <input type="password" id="staff-pass-input" placeholder="留白代表不修改" style="margin-top:4px;">
-            </div>
-            
-            <div style="text-align:left; margin-bottom:15px;">
-                <label style="font-size:12px; font-weight:bold; color:#c97288;">3. 設定「全新」高階密碼 (選填)</label>
-                <input type="password" id="new-boss-pass-input" placeholder="留白代表不修改" style="margin-top:4px;">
-            </div>
-            
-            <div class="modal-btn-row">
-                <button class="modal-btn-cancel" onclick="closePasswordSettingsModal()">取消</button>
-                <button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeSaveNewPasswords()">儲存</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="exchange-confirm-overlay" class="modal-overlay">
-        <div class="modal-box" style="border: 2px solid #c97288; max-width:340px;">
-            <div class="modal-title">💖 兌換商品確認</div>
-            <div id="exchange-confirm-msg" class="modal-text" style="font-size: 15px; padding: 2px 0; font-weight: bold; line-height: 1.4; margin-bottom:8px;">確認兌換訊息</div>
-            <div id="exchange-confirm-note-box" style="width:100%; box-sizing:border-box; margin-bottom:10px;"></div>
-            <div class="modal-btn-row" style="margin-top:15px;">
-                <button class="modal-btn-cancel" onclick="closeExchangeConfirmModal()">取消</button>
-                <button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeExchangeCoupon()">確定兌換</button>
-            </div>
-        </div>
-    </div>
+    <div id="exchange-confirm-overlay" class="modal-overlay"><div class="modal-box" style="border: 2px solid #c97288; max-width:340px;"><div class="modal-title">💖 兌換商品確認</div><div id="exchange-confirm-msg" class="modal-text" style="font-size: 15px; padding: 2px 0; font-weight: bold; line-height: 1.4; margin-bottom:8px;">確認兌換訊息</div><div id="exchange-confirm-note-box" style="width:100%; box-sizing:border-box; margin-bottom:10px;"></div><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeExchangeConfirmModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeExchangeCoupon()">確定兌換</button></div></div></div>
 
 </body>
 </html>
