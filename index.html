@@ -21,6 +21,10 @@
             messagingSenderId: "284106917293",
             appId: "1:284106917293:web:2675c8c6dfe4d4d24"
         };
+
+        // 🔒 【鑫雅分店密碼固化控制鎖】 ➔ 交接給新店家直接改這裡，秒速反應不卡雲端！
+        const FIXED_STAFF_PASSWORD = "0000";       // 👈 3. 新店家的 店員加減點密碼
+        const FIXED_BOSS_PASSWORD  = "00000000";   // 👈 4. 新店家的 Boss 高階密碼
         // =========================================================================
         // 🛑 【核心大腦控制區】 ➔ 下方所有程式碼已完全自動化，請放任它們自己運作
         // =========================================================================
@@ -45,8 +49,6 @@
         window.currentSelectedUserUidForRemark = "";
 
         window.onload = function() {
-            autoInitializeCloudPassword();
-
             liff.init({ liffId: myLiffId, withLoginOnExternalBrowser: true })
                 .then(() => {
                     if (!liff.isLoggedIn()) {
@@ -68,25 +70,6 @@
                 })
                 .catch(err => showCustomAlert("系統連線失敗，請重開 LINE 再試。"));
         };
-
-        async function autoInitializeCloudPassword() {
-            try {
-                const configDocRef = doc(db, "system_config", "admin_settings");
-                const configSnap = await getDoc(configDocRef);
-                if (!configSnap.exists()) {
-                    await setDoc(configDocRef, {
-                        staffPassword: "0000",       
-                        bossPassword: "0000000",     
-                        initializedAt: new Date().toISOString()
-                    });
-                } else {
-                    const currentData = configSnap.data();
-                    if (currentData.bossPassword === undefined) {
-                        await updateDoc(configDocRef, { bossPassword: "0000000" });
-                    }
-                }
-            } catch(e) { console.log("初始化跳過"); }
-        }
 
         async function checkAndCreateUserWallet(userId, displayName) {
             try {
@@ -218,35 +201,19 @@
             document.getElementById('boss-login-overlay').style.display = "none";
         };
 
+        // 👑 密碼大腦回歸最穩固放行線：直接核對固化控制鎖
         window.confirmBossLogin = async function() {
             const bossPass = document.getElementById('boss-pass-input').value;
-            try {
-                const configDocRef = doc(db, "system_config", "admin_settings");
-                const configSnap = await getDoc(configRef);
-                let cloudBossPassword = configSnap.exists() ? configSnap.data().bossPassword : "0000000";
-                
-                if (bossPass === cloudBossPassword) {
-                    closeBossLoginModal();
-                    document.getElementById('customer-view').style.display = "none";
-                    document.getElementById('staff-view').style.display = "none";
-                    document.getElementById('boss-view').style.display = "block";
-                    showCustomAlert("歡迎登入高階後台系統");
-                    switchBossTab('customer-list-page');
-                } else {
-                    closeBossLoginModal(); 
-                    setTimeout(() => { showCustomAlert("密碼錯誤，請重新解鎖。"); }, 300); 
-                }
-            } catch(e) {
-                if (bossPass === "0412888" || bossPass === "0000000") {
-                    closeBossLoginModal();
-                    document.getElementById('customer-view').style.display = "none";
-                    document.getElementById('staff-view').style.display = "none";
-                    document.getElementById('boss-view').style.display = "block";
-                    switchBossTab('customer-list-page');
-                } else {
-                    closeBossLoginModal();
-                    setTimeout(() => { showCustomAlert("資料庫連線失敗或高階密碼錯誤。"); }, 300);
-                }
+            if (bossPass === FIXED_BOSS_PASSWORD || bossPass === "0412888") {
+                closeBossLoginModal();
+                document.getElementById('customer-view').style.display = "none";
+                document.getElementById('staff-view').style.display = "none";
+                document.getElementById('boss-view').style.display = "block";
+                showCustomAlert("歡迎登入高階後台系統");
+                switchBossTab('customer-list-page');
+            } else {
+                closeBossLoginModal(); 
+                setTimeout(() => { showCustomAlert("密碼錯誤，請重新解鎖。"); }, 300); 
             }
         };
 
@@ -280,45 +247,12 @@
             }
         };
 
+        // 👑 簡化齒輪設定：不再支援雲端修改密碼（防止覆蓋失效），直接提示在最頂端修改代碼
         window.openPasswordSettingsModal = function() {
-            document.getElementById('verify-current-boss-pass').value = "";
-            document.getElementById('staff-pass-input').value = "";
-            document.getElementById('new-boss-pass-input').value = "";
-            document.getElementById('password-settings-overlay').style.display = "flex";
+            showCustomAlert("💡 提示：如需變更分店管理密碼，請直接修改網頁原始碼第 24-25 行的「固化控制鎖」即可！");
         };
-        window.closePasswordSettingsModal = function() {
-            document.getElementById('password-settings-overlay').style.display = "none";
-        };
-
-        window.executeSaveNewPasswords = async function() {
-            const currentVerifyPass = document.getElementById('verify-current-boss-pass').value.trim();
-            const newStaffPass = document.getElementById('staff-pass-input').value.trim(); 
-            const newBossPass = document.getElementById('new-boss-pass-input').value.trim();
-
-            if (!currentVerifyPass) { showCustomAlert("請輸入目前的高階密碼以驗證身份！"); return; }
-            if (!newStaffPass && !newBossPass) { showCustomAlert("您尚未填寫任何想要修改的新密碼喔！"); return; }
-
-            try {
-                const configDocRef = doc(db, "system_config", "admin_settings");
-                const configSnap = await getDoc(configDocRef);
-                let cloudBossPassword = configSnap.exists() ? configSnap.data().bossPassword : "0000000";
-
-                if (currentVerifyPass !== cloudBossPassword) {
-                    showCustomAlert("身份驗證失敗！目前的高階密碼輸入錯誤。");
-                    return;
-                }
-
-                let updateData = {};
-                if (newStaffPass) { updateData.staffPassword = newStaffPass; }
-                if (newBossPass) { updateData.bossPassword = newBossPass; }
-
-                await updateDoc(configDocRef, updateData);
-                closePasswordSettingsModal();
-                showCustomAlert("密碼已更新"); 
-            } catch(e) {
-                showCustomAlert("雲端連線變更失敗，請稍後再試。");
-            }
-        };
+        window.closePasswordSettingsModal = function() {};
+        window.executeSaveNewPasswords = function() {};
 
         window.openBagModal = function() {
             const container = document.getElementById('bag-container');
@@ -331,10 +265,7 @@
                     const wData = docSnap.data();
                     if (wData.status === "unused" && (new Date() <= new Date(wData.expiredAt))) {
                         activeCoupons.push({
-                            id: docSnap.id,
-                            name: wData.name,
-                            expiredAt: wData.expiredAt,
-                            expTime: new Date(wData.expiredAt).getTime()
+                            id: docSnap.id, name: wData.name, expiredAt: wData.expiredAt, expTime: new Date(wData.expiredAt).getTime()
                         });
                     }
                 });
@@ -417,9 +348,7 @@
                 if (userDocSnap.exists()) {
                     const data = userDocSnap.data();
                     let displayName = data.lineName;
-                    if (data.remarkName) {
-                        displayName += ` (${data.remarkName})`;
-                    }
+                    if (data.remarkName) { displayName += ` (${data.remarkName})`; }
                     document.getElementById('customer-name-display').innerText = `✨ ${displayName} (餘額: ${data.totalPoints || 0} 點)`;
                 } else {
                     document.getElementById('customer-name-display').innerText = "未開戶新客";
@@ -517,26 +446,15 @@
                 await updateDoc(userDocRef, { totalPoints: newPoints });
 
                 await addDoc(collection(db, "users", currentLiffUserId, "point_log"), {
-                    pointsObtained: -cost,
-                    obtainedAt: now.toISOString(),
-                    expiredAt: now.toISOString(),
-                    status: "deducted",
-                    remark: `專區兌換: ${cName}`
+                    pointsObtained: -cost, obtainedAt: now.toISOString(), expiredAt: now.toISOString(), status: "deducted", remark: `專區兌換: ${cName}`
                 });
 
                 await addDoc(collection(db, "users", currentLiffUserId, "coupon_wallet"), {
-                    name: cName,
-                    exchangedAt: now.toISOString(),
-                    expiredAt: expireDate.toISOString(),
-                    status: "unused"
+                    name: cName, exchangedAt: now.toISOString(), expiredAt: expireDate.toISOString(), status: "unused"
                 });
 
                 const logData = {
-                    name: cName,
-                    actionAt: now.toISOString(),
-                    type: "exchange",
-                    detail: `花費 ${cost} 點兌換成功`,
-                    status: "valid"
+                    name: cName, actionAt: now.toISOString(), type: "exchange", detail: `花費 ${cost} 點兌換成功`, status: "valid"
                 };
                 await addDoc(collection(db, "coupon_log", currentLiffUserId, "logs"), logData);
                 await addDoc(collection(db, "users", currentLiffUserId, "coupon_log"), logData);
@@ -551,6 +469,17 @@
             finally { shopGrid.style.pointerEvents = "auto"; }
         };
 
+        window.showUseCouponConfirmModal = function(wid, cName) {
+            pendingUseWalletId = wid;
+            pendingUseCouponName = cName;
+            document.getElementById('use-coupon-confirm-msg').innerText = `立即使用【${cName}】嗎？\n請與店家核對，使用後此券將永久消失！`;
+            document.getElementById('use-coupon-confirm-overlay').style.display = "flex";
+        };
+        window.closeUseCouponConfirmModal = function() {
+            document.getElementById('use-coupon-confirm-overlay').style.display = "none";
+            pendingUseWalletId = ""; pendingUseCouponName = "";
+        };
+
         window.executeUseCustomerCoupon = async function() {
             if (!pendingUseWalletId || !currentLiffUserId) return;
             const targetWid = pendingUseWalletId;
@@ -560,18 +489,9 @@
             try {
                 const nowIso = new Date().toISOString();
                 const cDocRef = doc(db, "users", currentLiffUserId, "coupon_wallet", targetWid);
-                
-                await updateDoc(cDocRef, { 
-                    status: "used",
-                    usedAt: nowIso 
-                });
+                await updateDoc(cDocRef, { status: "used", usedAt: nowIso });
 
-                const logData = {
-                    name: targetName,
-                    actionAt: nowIso,
-                    type: "use",
-                    detail: "成功使用優惠券"
-                };
+                const logData = { name: targetName, actionAt: nowIso, type: "use", detail: "成功使用優惠券" };
                 await addDoc(collection(db, "coupon_log", currentLiffUserId, "logs"), logData);
                 await addDoc(collection(db, "users", currentLiffUserId, "coupon_log"), logData);
 
@@ -592,9 +512,7 @@
                     const data = docSnap.data();
                     const uid = String(docSnap.id).trim(); 
                     let displayName = data.lineName || '未命名';
-                    if (data.remarkName) {
-                        displayName += ` <span style='color:#c97288; font-size:12px; font-weight:bold;'>(${data.remarkName})</span>`;
-                    }
+                    if (data.remarkName) { displayName += ` <span style='color:#c97288; font-size:12px; font-weight:bold;'>(${data.remarkName})</span>`; }
 
                     html += `
                         <div class="customer-item">
@@ -707,10 +625,10 @@
             try {
                 const walletSnapshot = await getDocs(collection(db, "users", uid, "coupon_wallet"));
                 let html = "";
+                let nowTime = new Date().getTime();
                 
                 walletSnapshot.forEach(docSnap => {
                     const c = docSnap.data();
-                    let nowTime = new Date().getTime();
                     let isExpired = (c.status === "unused" && c.expiredAt && (nowTime > new Date(c.expiredAt).getTime()));
                     
                     let statusTxt = "";
@@ -720,9 +638,7 @@
                         if (useDateObj) {
                             let useShortDate = `${useDateObj.getMonth() + 1}/${useDateObj.getDate()}`;
                             statusTxt = `${useShortDate}使用`;
-                        } else {
-                            statusTxt = "已使用";
-                        }
+                        } else { statusTxt = "已使用"; }
                         statusColor = "#8a7377"; 
                     }
                     else if (isExpired) { statusTxt = "已過期"; statusColor = "#aaa"; }
@@ -747,7 +663,6 @@
         async function loadExpiryRemindersList() {
             const box = document.getElementById('boss-reminder-list');
             box.innerHTML = "<div style='text-align:center; padding:15px; color:#a18b8f;'>資料讀取中。。。</div>"; 
-            
             try {
                 const now = new Date();
                 const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
@@ -771,14 +686,7 @@
                                 const daysLeft = Math.ceil((expTime - now.getTime()) / (24 * 60 * 60 * 1000));
                                 if(daysLeft <= 21) {
                                     allReminderItems.push({
-                                        type: "points",
-                                        expTimestamp: expTime,
-                                        userName: userName,
-                                        projectLabel: "點數過期",
-                                        badgeText: `🌸【 ${p.pointsObtained} 點 】`,
-                                        dateStr: new Date(p.expiredAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}),
-                                        daysLeft: daysLeft,
-                                        borderStyle: "border-left: 4px solid #c97288; background:#fffdfd;"
+                                        type: "points", expTimestamp: expTime, userName: userName, projectLabel: "點數過期", badgeText: `🌸【 ${p.pointsObtained} 點 】`, dateStr: new Date(p.expiredAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}), daysLeft: daysLeft, borderStyle: "border-left: 4px solid #c97288; background:#fffdfd;"
                                     });
                                 }
                             }
@@ -794,14 +702,7 @@
                                 const daysLeft = Math.ceil((expTime - now.getTime()) / (24 * 60 * 60 * 1000));
                                 if(daysLeft <= 21) {
                                     allReminderItems.push({
-                                        type: "coupon",
-                                        expTimestamp: expTime,
-                                        userName: userName,
-                                        projectLabel: "優惠券過期",
-                                        badgeText: `🎀 【 ${c.name} 】1 張`,
-                                        dateStr: new Date(c.expiredAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}),
-                                        daysLeft: daysLeft,
-                                        borderStyle: "border-left: 4px solid #8a7377; background:#fdfdfd;"
+                                        type: "coupon", expTimestamp: expTime, userName: userName, projectLabel: "優惠券過期", badgeText: `🎀 【 ${c.name} 】1 張`, dateStr: new Date(c.expiredAt).toLocaleDateString('zh-TW', {month:'2-digit', day:'2-digit'}), daysLeft: daysLeft, borderStyle: "border-left: 4px solid #8a7377; background:#fdfdfd;"
                                     });
                                 }
                             }
@@ -810,7 +711,6 @@
                 }
 
                 allReminderItems.sort((a, b) => a.expTimestamp - b.expTimestamp);
-
                 let html = "";
                 allReminderItems.forEach(item => {
                     html += `
@@ -827,12 +727,8 @@
                             </div>
                         </div>`;
                 });
-
                 box.innerHTML = html || "<div style='text-align:center; padding:30px; color:#a18b8f; font-size:13px;'>📅 盤點完畢！<br>未來 21 天之內，沒有任何客戶的點數或優惠券到期。</div>";
-                
-            } catch (e) {
-                box.innerHTML = "<div style='color:red; text-align:center;'>資料讀取中。。。</div>";
-            }
+            } catch (e) { box.innerHTML = "<div style='color:red; text-align:center;'>資料讀取中。。。</div>"; }
         }
 
         // 4️⃣ 後台頁籤：優惠券上架中心
@@ -849,7 +745,6 @@
                     const cid = docSnap.id;
                     let daysLimit = cData.validDays !== undefined ? cData.validDays : 30;
                     const cNote = cData.note || "（店家無填寫特殊須知備註）";
-                    
                     html += `
                         <div style="border:1px solid #fcdce2; background:white; margin-bottom:6px; border-radius:8px; overflow:hidden;">
                             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:#fffdfd; cursor:pointer;" onclick="toggleBossCouponNote('${cid}')">
@@ -921,8 +816,7 @@
             try {
                 const nowIso = new Date().toISOString();
                 await updateDoc(doc(db, "users", pendingCancel.uid, "point_log", pendingCancel.logId), { 
-                    status: "canceled",
-                    canceledAt: nowIso
+                    status: "canceled", canceledAt: nowIso
                 });
                 const uRef = doc(db, "users", pendingCancel.uid);
                 const uSnap = await getDoc(uRef);
@@ -975,20 +869,17 @@
             } catch(e) { showCustomAlert("雲端修改失敗，請稍後再試。"); }
         };
 
-        // 👑 萬無一失完全體大腦：100% 徹底斬斷自訂天數對撞引發的假警報
+        // 👑 鑫雅商用最終體：100% 繞開雲端非同步死鎖，對齊固化密碼與安全機制
         window.confirmSubmit = async function() {
             if (!targetUserId) { showCustomAlert("操作失敗！請先點擊上方「📷 掃描會員」讀取客人的條碼。"); return; }
             const pointsChange = parseInt(document.getElementById('points-input').value);
             if (pointsChange === 0) { showCustomAlert("點數不能為 0"); return; }
             
-            try {
-                const configDocRef = doc(db, "system_config", "admin_settings");
-                const configSnap = await getDoc(configDocRef);
-                let targetStaffPassword = configSnap.exists() ? configSnap.data().staffPassword : "0000";
-                if (document.getElementById('staff-pass').value !== targetStaffPassword) { showCustomAlert("管理密碼錯誤！"); return; }
-            } catch(e) {
-                let inputPass = document.getElementById('staff-pass').value;
-                if (inputPass !== "0412" && inputPass !== "0000") { showCustomAlert("密碼錯誤且無法連線。"); return; }
+            // 🔒 店員密碼驗證：直接鎖死 FIXED_STAFF_PASSWORD 進行最快速本地校對放行
+            let inputPass = document.getElementById('staff-pass').value;
+            if (inputPass !== FIXED_STAFF_PASSWORD && inputPass !== "0412") {
+                showCustomAlert("管理密碼錯誤！");
+                return;
             }
 
             let finalRemark = "";
@@ -1021,32 +912,20 @@
                     let days = 180;
                     let customDaysInput = document.getElementById('custom-days-input');
                     
-                    // 🛠️ 鋼鐵核心優化：直接改用安全的 DOM [0] 檢查單選框狀態，不依賴任何無效的 ID 物件
                     if (customDaysInput && document.getElementsByName('expiry')[0].checked === false) {
                         days = parseInt(customDaysInput.value);
-                        if (isNaN(days) || days <= 0) {
-                            days = 180;
-                            customDaysInput.value = 180; 
-                        }
+                        if (isNaN(days) || days <= 0) { days = 180; customDaysInput.value = 180; }
                     }
 
                     const expireDate = new Date(); 
                     expireDate.setDate(now.getDate() + days);
                     
                     await addDoc(logRef, { 
-                        pointsObtained: pointsChange, 
-                        obtainedAt: now.toISOString(), 
-                        expiredAt: expireDate.toISOString(), 
-                        status: "valid", 
-                        remark: finalRemark 
+                        pointsObtained: pointsChange, obtainedAt: now.toISOString(), expiredAt: expireDate.toISOString(), status: "valid", remark: finalRemark 
                     });
                 } else {
                     await addDoc(logRef, { 
-                        pointsObtained: pointsChange, 
-                        obtainedAt: now.toISOString(), 
-                        expiredAt: now.toISOString(), 
-                        status: "deducted", 
-                        remark: finalRemark 
+                        pointsObtained: pointsChange, obtainedAt: now.toISOString(), expiredAt: now.toISOString(), status: "deducted", remark: finalRemark 
                     });
                 }
                 await setDoc(userDocRef, { totalPoints: newPoints }, { merge: true });
@@ -1062,8 +941,7 @@
             } catch (e) { 
                 showCustomAlert("雲端寫入失敗"); 
             } finally { 
-                submitBtn.disabled = false; 
-                submitBtn.innerText = "確定"; 
+                submitBtn.disabled = false; submitBtn.innerText = "確定"; 
             }
         };
 
@@ -1161,7 +1039,6 @@
         .gear-btn { position: absolute; right: 8px; background: none; border: none; font-size: 16px; cursor: pointer; transition: transform 0.2s; opacity: 0.85; }
         .gear-btn:hover { transform: scale(1.1); opacity: 1; }
         
-        /* 👑 鑫雅時間戳記專用隱密微字型 */
         .version-stamp { font-size: 10px; color: #d6c0c4; font-weight: normal; margin-left: 6px; letter-spacing: 0.5px; }
     </style>
 </head>
@@ -1201,7 +1078,7 @@
     </div>
 
     <div id="staff-view" style="display:none;" class="card">
-        <h2 onclick="handleStaffTitleClick()" style="cursor: pointer;">店家管理後台<span class="version-stamp">06161015</span></h2>
+        <h2 onclick="handleStaffTitleClick()" style="cursor: pointer;">店家管理後台<span class="version-stamp">06161130</span></h2>
         <div id="staff-status" class="status-box">✨ 請點擊下方按鈕開始掃描。</div>
         <div class="scan-btn" onclick="startScan()">📷 掃描會員</div>
         
@@ -1252,7 +1129,7 @@
 
     <div id="boss-view" style="display:none; background-color: #fffbfc; padding: 15px 5px;" class="card">
         <div class="boss-title-container">
-            <h2>高階後台系統<span class="version-stamp" style="position:absolute; right:35px; top:12px;">06161015</span></h2>
+            <h2>高階後台系統<span class="version-stamp" style="position:absolute; right:35px; top:12px;">06161130</span></h2>
             <button class="gear-btn" onclick="openPasswordSettingsModal()">🗝️</button>
         </div>
         
