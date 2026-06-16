@@ -8,7 +8,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <script type="module">
+        // =========================================================================
+        // 🔑 【新分店金鑰更換專區】 ➔ 未來開新店「只需要改這裡」，下方完全不用動！
+        // =========================================================================
         const myLiffId = '2010135064-mXyTOHst'; 
+
         const firebaseConfig = {
             apiKey: "AIzaSyAqsN1y3eNHtQ4PiYpWIuxZC8eN6o0bK24",             
             authDomain: "line-loyalty-card.firebaseapp.com",
@@ -17,6 +21,7 @@
             messagingSenderId: "284106917293",
             appId: "1:284106917293:web:2675c8c6dfe4d4d24"
         };
+        // =========================================================================
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, orderBy, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -28,39 +33,33 @@
         let customerClickCount = 0, staffClickCount = 0;    
         let pendingCancel = {}, pendingDeleteUid = "", pendingCouponId = "", pendingUseWalletId = "", pendingUseCouponName = "", pendingExchangeData = {};
 
-        // 綁定全域函數
-        window.confirmSubmit = confirmSubmit; window.changePoints = changePoints; window.startScan = startScan;
-        window.toggleAccordion = toggleAccordion; window.openShopModal = openShopModal; window.closeShopModal = closeShopModal;
-        window.askExchangeConfirm = askExchangeConfirm; window.closeExchangeConfirmModal = closeExchangeConfirmModal;
-        window.executeExchangeCoupon = executeExchangeCoupon; window.openBagModal = openBagModal; window.closeBagModal = closeBagModal;
-        window.setExpireDays = setExpireDays; window.handleCustomerTitleClick = handleCustomerTitleClick; window.handleStaffTitleClick = handleStaffTitleClick;
-        window.closeCustomAlert = closeCustomAlert; window.confirmBossLogin = confirmBossLogin; window.closeBossLoginModal = closeBossLoginModal;
-        window.switchBossTab = switchBossTab; window.openPasswordSettingsModal = openPasswordSettingsModal;
-        window.toggleBossCouponNote = toggleBossCouponNote; window.showUnpublishCouponModal = showUnpublishCouponModal;
-        window.closeUnpublishCouponModal = closeUnpublishCouponModal; window.executeUnpublishCoupon = executeUnpublishCoupon;
-        window.executeAddNewCoupon = executeAddNewCoupon; window.showCancelConfirmModal = showCancelConfirmModal;
-        window.closeCancelConfirmModal = closeCancelConfirmModal; window.executeCancelPoint = executeCancelPoint;
-        window.showDeleteMemberModal = showDeleteMemberModal; window.closeDeleteMemberModal = closeDeleteMemberModal;
-        window.executeDeleteMember = executeDeleteMember; window.openRemarkModalDirect = openRemarkModalDirect;
-        window.closeRemarkModal = closeRemarkModal; window.executeSaveRemark = executeSaveRemark;
-        window.setDeductRemark = setDeductRemark; window.setCouponExpireDays = setCouponExpireDays;
-        window.showUseCouponConfirmModal = showUseCouponConfirmModal; window.closeUseCouponConfirmModal = closeUseCouponConfirmModal;
-        window.executeUseCustomerCoupon = executeUseCustomerCoupon;
+        // --- 1. 底層核心核心功能定義 ---
+        
+        function dataNameSafe(str) { return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
-        window.onload = function() {
-            liff.init({ liffId: myLiffId, withLoginOnExternalBrowser: true }).then(() => {
-                if (!liff.isLoggedIn()) { liff.login(); } else {
-                    liff.getProfile().then(profile => {
-                        currentLiffUserId = profile.userId; 
-                        document.getElementById('username').innerText = "嗨！ " + profile.displayName;
-                        checkAndCreateUserWallet(profile.userId, profile.displayName);
-                        generateMemberQRCode(profile.userId);
-                        loadPointHistory(profile.userId);
-                        loadCustomerCouponHistory(profile.userId);
-                    });
-                }
-            }).catch(err => showCustomAlert("系統連線失敗。"));
-        };
+        function showCustomAlert(msg) { document.getElementById('alert-msg').innerText = msg; document.getElementById('custom-alert-overlay').style.display = "flex"; }
+        function closeCustomAlert() { document.getElementById('custom-alert-overlay').style.display = "none"; }
+        function showBossLoginModal() { document.getElementById('boss-pass-input').value = ""; document.getElementById('boss-login-overlay').style.display = "flex"; document.getElementById('boss-pass-input').focus(); }
+        function closeBossLoginModal() { document.getElementById('boss-login-overlay').style.display = "none"; }
+        
+        function toggleAccordion(id) {
+            const el = document.getElementById(id); const icon = document.getElementById(id + '-icon');
+            if (el.style.display === "block") { el.style.display = "none"; icon.innerText = "➕"; } 
+            else { el.style.display = "block"; icon.innerText = "➖"; }
+        }
+
+        function toggleFormFields(val) {
+            if (val < 0) { document.getElementById('remark-add-group').style.display = "none"; document.getElementById('remark-deduct-group').style.display = "block"; document.getElementById('expiry-group').style.display = "none"; }
+            else { document.getElementById('remark-add-group').style.display = "block"; document.getElementById('remark-deduct-group').style.display = "none"; document.getElementById('expiry-group').style.display = "block"; }
+        }
+        function setExpireDays(days) { const input = document.getElementById('custom-days-input'); input.style.display = (days === 'custom') ? "block" : "none"; if (days !== 'custom') input.value = days; }
+        function setCouponExpireDays(days) { const input = document.getElementById('custom-coupon-days-input'); input.style.display = (days === 'custom') ? "block" : "none"; if (days !== 'custom') input.value = days; }
+        function setDeductRemark(mode) { document.getElementById('custom-remark-deduct-box').style.display = (mode === 'custom') ? "block" : "none"; }
+
+        function handleCustomerTitleClick() { customerClickCount++; if (customerClickCount === 5) { customerClickCount = 0; document.getElementById('customer-view').style.display = "none"; document.getElementById('boss-view').style.display = "none"; document.getElementById('staff-view').style.display = "block"; targetUserId = ""; document.getElementById('customer-name-display').innerText = "🌸 請掃描客戶QR code 🌸"; document.getElementById('staff-status').innerText = "✨ 請點擊下方按鈕開始掃描。"; toggleFormFields(1); showCustomAlert("已成功切換至店家管理後台"); } setTimeout(() => { customerClickCount = 0; }, 3000); }
+        function handleStaffTitleClick() { staffClickCount++; if (staffClickCount === 5) { staffClickCount = 0; showBossLoginModal(); } setTimeout(() => { staffClickCount = 0; }, 3000); }
+
+        // --- 2. 雲端資料與歷史紀錄載入功能 ---
 
         async function checkAndCreateUserWallet(userId, displayName) {
             try {
@@ -93,7 +92,7 @@
                     if (isAdd && log.expiredAt) dateInfo += ` ~ ${new Date(log.expiredAt).toLocaleDateString()}`;
                     let rowStyle = (isCanceled || isExpired) ? 'style="text-decoration: line-through; color: #aaa;"' : '';
                     let suffix = isCanceled ? ' <span style="color:#ff4d4f;">(已註銷)</span>' : (isExpired ? ' <span style="color:#aaa;">(已過期)</span>' : '');
-                    html += `<li ${rowStyle}><strong style="color:${(isCanceled||isExpired)?'#aaa':(isAdd?'#c97288':'#8a7377')}">${isAdd?'+':''}${log.pointsObtained} 點</strong><br><small>${log.remark} (${dateInfo})${suffix}</small></li>`;
+                    html += `<li ${rowStyle}><strong style="color:${(isCanceled||isExpired)?'#aaa':(isAdd?'#c97288':'#8a7377')}">${isAdd ? '+':''}${log.pointsObtained} 點</strong><br><small>${log.remark} (${dateInfo})${suffix}</small></li>`;
                 });
                 listEl.innerHTML = html;
             } catch(e) { listEl.innerHTML = "<li>資料讀取中。。。</li>"; }
@@ -121,68 +120,7 @@
             listEl.innerHTML = html;
         }
 
-        function handleCustomerTitleClick() { customerClickCount++; if (customerClickCount === 5) { customerClickCount = 0; document.getElementById('customer-view').style.display = "none"; document.getElementById('boss-view').style.display = "none"; document.getElementById('staff-view').style.display = "block"; targetUserId = ""; document.getElementById('customer-name-display').innerText = "🌸 請掃描客戶QR code 🌸"; document.getElementById('staff-status').innerText = "✨ 請點擊下方按鈕開始掃描。"; toggleFormFields(1); showCustomAlert("已成功切換至店家管理後台"); } setTimeout(() => { customerClickCount = 0; }, 3000); }
-        function handleStaffTitleClick() { staffClickCount++; if (staffClickCount === 5) { staffClickCount = 0; showBossLoginModal(); } setTimeout(() => { staffClickCount = 0; }, 3000); }
-        function showCustomAlert(msg) { document.getElementById('alert-msg').innerText = msg; document.getElementById('custom-alert-overlay').style.display = "flex"; }
-        function closeCustomAlert() { document.getElementById('custom-alert-overlay').style.display = "none"; }
-        function showBossLoginModal() { document.getElementById('boss-pass-input').value = ""; document.getElementById('boss-login-overlay').style.display = "flex"; document.getElementById('boss-pass-input').focus(); }
-        function closeBossLoginModal() { document.getElementById('boss-login-overlay').style.display = "none"; }
-
-        async function confirmBossLogin() {
-            const bossPass = document.getElementById('boss-pass-input').value;
-            try {
-                const configSnap = await getDoc(doc(db, "system_config", "admin_settings"));
-                let cloudBossPass = configSnap.exists() ? (configSnap.data().bossPassword || "") : "";
-                if (bossPass === cloudBossPass && cloudBossPass !== "") {
-                    closeBossLoginModal(); document.getElementById('customer-view').style.display = "none"; document.getElementById('staff-view').style.display = "none"; document.getElementById('boss-view').style.display = "block"; showCustomAlert("歡迎登入高階後台系統"); switchBossTab('customer-list-page');
-                } else { closeBossLoginModal(); setTimeout(() => { showCustomAlert("密碼錯誤，請重新輸入。"); }, 300); }
-            } catch (e) { closeBossLoginModal(); showCustomAlert("驗證失敗，請檢查網路。"); }
-        }
-
-        function switchBossTab(pageId) {
-            document.getElementById('customer-list-page').style.display = "none"; document.getElementById('coupon-list-page').style.display = "none"; document.getElementById('reminder-list-page').style.display = "none"; document.getElementById('coupon-factory-page').style.display = "none";
-            document.getElementById('tab-btn-cust').className = 'boss-tab-btn'; document.getElementById('tab-btn-coup').className = 'boss-tab-btn'; document.getElementById('tab-btn-remind').className = 'boss-tab-btn'; document.getElementById('tab-btn-fac').className = 'boss-tab-btn';
-            if (pageId === 'customer-list-page') { document.getElementById('customer-list-page').style.display = "block"; document.getElementById('tab-btn-cust').className = 'boss-tab-btn tab-active'; loadAllCustomers(); }
-            else if (pageId === 'coupon-list-page') { document.getElementById('coupon-list-page').style.display = "block"; document.getElementById('tab-btn-coup').className = 'boss-tab-btn tab-active'; loadAllCouponsMaster(); }
-            else if (pageId === 'reminder-list-page') { document.getElementById('reminder-list-page').style.display = "block"; document.getElementById('tab-btn-remind').className = 'boss-tab-btn tab-active'; loadExpiryRemindersList(); }
-            else if (pageId === 'coupon-factory-page') { document.getElementById('coupon-factory-page').style.display = "block"; document.getElementById('tab-btn-fac').className = 'boss-tab-btn tab-active'; loadBossCouponsMaster(); }
-        }
-
-        function openPasswordSettingsModal() { showCustomAlert("💡 提示：管理權限密碼請前往雲端資料庫的「system_config ➔ admin_settings」中進行更動，系統將會實時連線同步！"); }
-        function openBagModal() {
-            const container = document.getElementById('bag-container'); container.innerHTML = "<div style='color:#a18b8f;'>資料讀取中。。。</div>"; document.getElementById('bag-overlay').style.display = "flex"; if (!currentLiffUserId) return;
-            getDocs(collection(db, "users", currentLiffUserId, "coupon_wallet")).then(userBagSnapshot => {
-                let activeCoupons = []; userBagSnapshot.forEach(docSnap => { const wData = docSnap.data(); if (wData.status === "unused" && (new Date() <= new Date(wData.expiredAt))) { activeCoupons.push({ id: docSnap.id, name: wData.name, expiredAt: wData.expiredAt, expTime: new Date(wData.expiredAt).getTime() }); } });
-                activeCoupons.sort((a, b) => a.expTime - b.expTime); let html = "";
-                activeCoupons.forEach(coupon => { html += `<div class="bag-item"><div style="text-align:left;max-width:65%;"><div class="bag-item-title">🎀 ${coupon.name}</div><div class="bag-item-date">有效期至: ${new Date(coupon.expiredAt).toLocaleDateString()}</div></div><button class="bag-use-btn" onclick="showUseCouponConfirmModal('${coupon.id}', '${dataNameSafe(coupon.name)}')">立即使用</button></div>`; });
-                container.innerHTML = html || "<div style='padding:30px;color:#a18b8f;'>您目前口袋空空。</div>";
-            }).catch(e => { container.innerHTML = "<div style='color:red;'>資料讀取中。。。</div>"; });
-        }
-        function closeBagModal() { document.getElementById('bag-overlay').style.display = "none"; }
-        function changePoints(amount) { let input = document.getElementById('points-input'); let newVal = (parseInt(input.value) || 0) + amount; input.value = newVal; toggleFormFields(newVal); }
-
-        function toggleFormFields(val) {
-            if (val < 0) { document.getElementById('remark-add-group').style.display = "none"; document.getElementById('remark-deduct-group').style.display = "block"; document.getElementById('expiry-group').style.display = "none"; }
-            else { document.getElementById('remark-add-group').style.display = "block"; document.getElementById('remark-deduct-group').style.display = "none"; document.getElementById('expiry-group').style.display = "block"; }
-        }
-        function setExpireDays(days) { const input = document.getElementById('custom-days-input'); input.style.display = (days === 'custom') ? "block" : "none"; if (days !== 'custom') input.value = days; }
-        function setCouponExpireDays(days) { const input = document.getElementById('custom-coupon-days-input'); input.style.display = (days === 'custom') ? "block" : "none"; if (days !== 'custom') input.value = days; }
-        function setDeductRemark(mode) { document.getElementById('custom-remark-deduct-box').style.display = (mode === 'custom') ? "block" : "none"; }
-
-        function startScan() {
-            document.getElementById('staff-status').innerText = "✨ 安全連線中，正在喚醒相機...";
-            liff.scanCodeV2().then(result => { if (result && result.value) { targetUserId = result.value; document.getElementById('staff-status').innerText = "💖 掃描成功！已順利綁定會員。"; fetchCustomerInfo(targetUserId); } }).catch(err => { document.getElementById('staff-status').innerText = "相機開啟失敗。"; });
-        }
-
-        async function fetchCustomerInfo(uid) {
-            try {
-                const userDocSnap = await getDoc(doc(db, "users", uid));
-                if (userDocSnap.exists()) {
-                    const data = userDocSnap.data(); let displayName = data.lineName + (data.remarkName ? ` (${data.remarkName})` : "");
-                    document.getElementById('customer-name-display').innerText = `✨ ${displayName} (餘額: ${data.totalPoints || 0} 點)`;
-                } else { document.getElementById('customer-name-display').innerText = "未開戶新客"; }
-            } catch (e) { document.getElementById('customer-name-display').innerText = "資料讀取中。。。"; }
-        }
+        // --- 3. 客戶端專區與優惠券功能 ---
 
         function openShopModal() {
             const grid = document.getElementById('shop-grid'); grid.innerHTML = "<div style='grid-column: span 2; color:#a18b8f;'>資料讀取中。。。</div>"; document.getElementById('shop-overlay').style.display = "flex";
@@ -228,12 +166,23 @@
             } catch(e) { showCustomAlert("交易失敗"); } finally { shopGrid.style.pointerEvents = "auto"; }
         }
 
+        function openBagModal() {
+            const container = document.getElementById('bag-container'); container.innerHTML = "<div style='color:#a18b8f;'>資料讀取中。。。</div>"; document.getElementById('bag-overlay').style.display = "flex"; if (!currentLiffUserId) return;
+            getDocs(collection(db, "users", currentLiffUserId, "coupon_wallet")).then(userBagSnapshot => {
+                let activeCoupons = []; userBagSnapshot.forEach(docSnap => { const wData = docSnap.data(); if (wData.status === "unused" && (new Date() <= new Date(wData.expiredAt))) { activeCoupons.push({ id: docSnap.id, name: wData.name, expiredAt: wData.expiredAt, expTime: new Date(wData.expiredAt).getTime() }); } });
+                activeCoupons.sort((a, b) => a.expTime - b.expTime); let html = "";
+                activeCoupons.forEach(coupon => { html += `<div class="bag-item"><div style="text-align:left;max-width:65%;"><div class="bag-item-title">🎀 ${coupon.name}</div><div class="bag-item-date">有效期至: ${new Date(coupon.expiredAt).toLocaleDateString()}</div></div><button class="bag-use-btn" onclick="showUseCouponConfirmModal('${coupon.id}', '${dataNameSafe(coupon.name)}')">立即使用</button></div>`; });
+                container.innerHTML = html || "<div style='padding:30px;color:#a18b8f;'>您目前口袋空空。</div>";
+            }).catch(e => { container.innerHTML = "<div style='color:red;'>資料讀取中。。。</div>"; });
+        }
+        function closeBagModal() { document.getElementById('bag-overlay').style.display = "none"; }
+
         function showUseCouponConfirmModal(wid, cName) { pendingUseWalletId = wid; pendingUseCouponName = cName; document.getElementById('use-coupon-confirm-msg').innerText = `立即使用【${cName}】嗎？`; document.getElementById('use-coupon-confirm-overlay').style.display = "flex"; }
         function closeUseCouponConfirmModal() { document.getElementById('use-coupon-confirm-overlay').style.display = "none"; pendingUseWalletId = ""; pendingUseCouponName = ""; }
 
         async function executeUseCustomerCoupon() {
             if (!pendingUseWalletId || !currentLiffUserId) return;
-            const wid = pendingUseWalletId, name = pendingUseCouponName; window.closeUseCouponConfirmModal();
+            const wid = pendingUseWalletId, name = pendingUseCouponName; closeUseCouponConfirmModal();
             try {
                 const nowIso = new Date().toISOString(); await updateDoc(doc(db, "users", currentLiffUserId, "coupon_wallet", wid), { status: "used", usedAt: nowIso });
                 const logData = { name: name, actionAt: nowIso, type: "use", detail: "成功使用優惠券" };
@@ -241,6 +190,48 @@
                 await addDoc(collection(db, "users", currentLiffUserId, "coupon_log"), logData);
                 showCustomAlert(`✅【${name}】已成功使用！`); loadCustomerCouponHistory(currentLiffUserId); closeBagModal();
             } catch(e) { showCustomAlert("操作失敗"); }
+        }
+
+        // --- 4. 店家與高階管理員後台功能 ---
+
+        function startScan() {
+            document.getElementById('staff-status').innerText = "✨ 安全連線中，正在喚醒相機...";
+            liff.scanCodeV2().then(result => { if (result && result.value) { targetUserId = result.value; document.getElementById('staff-status').innerText = "💖 掃描成功！已順利綁定會員。"; fetchCustomerInfo(targetUserId); } }).catch(err => { document.getElementById('staff-status').innerText = "相機開啟失敗。"; });
+        }
+
+        async function confirmSubmit() {
+            if (!targetUserId) { showCustomAlert("操作失敗！請先點擊上方「📷 掃描會員」。"); return; }
+            const pointsChange = parseInt(document.getElementById('points-input').value); if (pointsChange === 0) { showCustomAlert("點數不能為 0"); return; }
+            let inputPass = document.getElementById('staff-pass').value; const submitBtn = document.getElementById('staff-submit-btn'); submitBtn.disabled = true; submitBtn.innerText = "驗證中...";
+            try {
+                const configSnap = await getDoc(doc(db, "system_config", "admin_settings"));
+                let cloudStaffPass = configSnap.exists() ? (configSnap.data().staffPassword || "") : "";
+                if (inputPass !== cloudStaffPass || cloudStaffPass === "") { showCustomAlert("管理密碼錯誤！"); submitBtn.disabled = false; submitBtn.innerText = "確定"; return; }
+                let finalRemark = pointsChange < 0 ? (document.getElementById('rb-deduct-custom').checked ? document.getElementById('custom-remark-deduct-box').value.trim() : (document.getElementById('rb-deduct-1').checked ? "優惠券" : "誤發扣除")) : (document.getElementById('remark-input-add').value.trim() || "店家發放");
+                if (pointsChange < 0 && !finalRemark) { showCustomAlert("請填寫原因！"); submitBtn.disabled = false; submitBtn.innerText = "確定"; return; }
+                const userDocRef = doc(db, "users", targetUserId), userDocSnap = await getDoc(userDocRef);
+                let currentPoints = userDocSnap.exists() ? (userDocSnap.data().totalPoints || 0) : 0, newPoints = currentPoints + pointsChange;
+                const logRef = collection(db, "users", targetUserId, "point_log"), now = new Date();
+                if (pointsChange > 0) {
+                    let days = 180; const customDaysInput = document.getElementById('custom-days-input'); if (customDaysInput && document.getElementsByName('expiry')[0].checked === false) { days = parseInt(customDaysInput.value) || 180; }
+                    const expireDate = new Date(); expireDate.setDate(now.getDate() + days);
+                    await addDoc(logRef, { pointsObtained: pointsChange, obtainedAt: now.toISOString(), expiredAt: expireDate.toISOString(), status: "valid", remark: finalRemark });
+                } else { await addDoc(logRef, { pointsObtained: pointsChange, obtainedAt: now.toISOString(), expiredAt: now.toISOString(), status: "deducted", remark: finalRemark }); }
+                await setDoc(userDocRef, { totalPoints: newPoints }, { merge: true });
+                showCustomAlert(pointsChange > 0 ? `本次新增 ${pointsChange} 點，餘額：${newPoints}` : `本次扣除 ${Math.abs(pointsChange)} 點，餘額：${newPoints}`);
+                targetUserId = ""; document.getElementById('customer-name-display').innerText = "🌸 請掃描客戶QR code 🌸"; document.getElementById('points-input').value = "1"; toggleFormFields(1);
+            } catch (e) { showCustomAlert("雲端寫入失敗"); } finally { submitBtn.disabled = false; submitBtn.innerText = "確定"; }
+        }
+
+        async function confirmBossLogin() {
+            const bossPass = document.getElementById('boss-pass-input').value;
+            try {
+                const configSnap = await getDoc(doc(db, "system_config", "admin_settings"));
+                let cloudBossPass = configSnap.exists() ? (configSnap.data().bossPassword || "") : "";
+                if (bossPass === cloudBossPass && cloudBossPass !== "") {
+                    closeBossLoginModal(); document.getElementById('customer-view').style.display = "none"; document.getElementById('staff-view').style.display = "none"; document.getElementById('boss-view').style.display = "block"; showCustomAlert("歡迎登入高階後台系統"); switchBossTab('customer-list-page');
+                } else { closeBossLoginModal(); setTimeout(() => { showCustomAlert("密碼錯誤，請重新輸入。"); }, 300); }
+            } catch (e) { closeBossLoginModal(); showCustomAlert("驗證失敗，請檢查網路。"); }
         }
 
         async function loadAllCustomers() {
@@ -288,11 +279,23 @@
             } catch (e) { box.innerHTML = "<div style='color:red;'>資料讀取中。。。</div>"; }
         }
 
+        async function loadBossCouponsMaster() {
+            const box = document.getElementById('boss-coupons-master-list'); box.innerHTML = "<div style='color:#a18b8f; font-size:12px;'>資料讀取中。。。</div>"; 
+            try {
+                const qSnapshot = await getDocs(query(collection(db, "coupons"), orderBy("cost", "desc")));
+                if (qSnapshot.empty) { box.innerHTML = "<p style='font-size:12px;color:#a18b8f;'>目前總專區架上沒有商品。</p>"; return; }
+                let html = "";
+                qSnapshot.forEach(docSnap => {
+                    const cData = docSnap.data(); const cid = docSnap.id; let daysLimit = cData.validDays !== undefined ? cData.validDays : 30;
+                    html += `<div style="border:1px solid #fcdce2;background:white;margin-bottom:6px;border-radius:8px;overflow:hidden;"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#fffdfd;cursor:pointer;" onclick="toggleBossCouponNote('${cid}')"><div style="text-align:left;font-size:13px;max-width:70%;"><strong>🎀 ${cData.name}</strong><br><small style="color:#c97288;">兌換點數: ${cData.cost !== undefined ? cData.cost : 0} 點 | 效期: ${daysLimit} 天</small></div><button class="cancel-point-btn" style="margin-left:5px;" onclick="event.stopPropagation(); showUnpublishCouponModal('${cid}', '${dataNameSafe(cData.name)}')">❌ 下架</button></div><div id="boss-note-${cid}" style="display:none;padding:8px 12px;background:#fffbfb;border-top:1px dashed #fcdce2;text-align:left;font-size:11px;color:#8a7377;white-space:pre-wrap;word-break:break-all;">📝 <strong>備註：</strong>\n${cData.note || '無'}</div></div>`;
+                });
+                box.innerHTML = html;
+            } catch(e) { box.innerHTML = "<p>總名冊盤點失敗</p>"; }
+        }
+
         async function executeAddNewCoupon() {
-            const name = document.getElementById('coupon-name-input').value.trim();
-            const cost = parseInt(document.getElementById('coupon-cost-input').value);
-            const validDays = parseInt(document.getElementById('custom-coupon-days-input').value) || 30; 
-            const note = document.getElementById('coupon-note-input').value.trim();
+            const name = document.getElementById('coupon-name-input').value.trim(); const cost = parseInt(document.getElementById('coupon-cost-input').value);
+            const validDays = parseInt(document.getElementById('custom-coupon-days-input').value) || 30; const note = document.getElementById('coupon-note-input').value.trim();
             if (!name || isNaN(cost) || cost <= 0) { showCustomAlert("請檢查輸入內容！"); return; }
             try {
                 await addDoc(collection(db, "coupons"), { name: name, cost: cost, validDays: validDays, note: note, createdAt: new Date().toISOString() });
@@ -301,31 +304,28 @@
             } catch(e) { showCustomAlert("上架失敗"); }
         }
 
-        async function confirmSubmit() {
-            if (!targetUserId) { showCustomAlert("操作失敗！請先點擊上方「📷 掃描會員」。"); return; }
-            const pointsChange = parseInt(document.getElementById('points-input').value); if (pointsChange === 0) { showCustomAlert("點數不能為 0"); return; }
-            let inputPass = document.getElementById('staff-pass').value; const submitBtn = document.getElementById('staff-submit-btn'); submitBtn.disabled = true; submitBtn.innerText = "驗證中...";
-            try {
-                const configSnap = await getDoc(doc(db, "system_config", "admin_settings"));
-                let cloudStaffPass = configSnap.exists() ? (configSnap.data().staffPassword || "") : "";
-                if (inputPass !== cloudStaffPass || cloudStaffPass === "") { showCustomAlert("管理密碼錯誤！"); submitBtn.disabled = false; submitBtn.innerText = "確定"; return; }
-                let finalRemark = pointsChange < 0 ? (document.getElementById('rb-deduct-custom').checked ? document.getElementById('custom-remark-deduct-box').value.trim() : (document.getElementById('rb-deduct-1').checked ? "優惠券" : "誤發扣除")) : (document.getElementById('remark-input-add').value.trim() || "店家發放");
-                if (pointsChange < 0 && !finalRemark) { showCustomAlert("請填寫原因！"); submitBtn.disabled = false; submitBtn.innerText = "確定"; return; }
-                const userDocRef = doc(db, "users", targetUserId), userDocSnap = await getDoc(userDocRef);
-                let currentPoints = userDocSnap.exists() ? (userDocSnap.data().totalPoints || 0) : 0, newPoints = currentPoints + pointsChange;
-                const logRef = collection(db, "users", targetUserId, "point_log"), now = new Date();
-                if (pointsChange > 0) {
-                    let days = 180; const customDaysInput = document.getElementById('custom-days-input'); if (customDaysInput && document.getElementsByName('expiry')[0].checked === false) { days = parseInt(customDaysInput.value) || 180; }
-                    const expireDate = new Date(); expireDate.setDate(now.getDate() + days);
-                    await addDoc(logRef, { pointsObtained: pointsChange, obtainedAt: now.toISOString(), expiredAt: expireDate.toISOString(), status: "valid", remark: finalRemark });
-                } else { await addDoc(logRef, { pointsObtained: pointsChange, obtainedAt: now.toISOString(), expiredAt: now.toISOString(), status: "deducted", remark: finalRemark }); }
-                await setDoc(userDocRef, { totalPoints: newPoints }, { merge: true });
-                showCustomAlert(pointsChange > 0 ? `本次新增 ${pointsChange} 點，餘額：${newPoints}` : `本次扣除 ${Math.abs(pointsChange)} 點，餘額：${newPoints}`);
-                targetUserId = ""; document.getElementById('customer-name-display').innerText = "🌸 請掃描客戶QR code 🌸"; document.getElementById('points-input').value = "1"; toggleFormFields(1);
-            } catch (e) { showCustomAlert("雲端寫入失敗"); } finally { submitBtn.disabled = false; submitBtn.innerText = "確定"; }
-        }
+        window.executeUnpublishCoupon = async function() { if (!pendingCouponId) return; closeUnpublishCouponModal(); try { await deleteDoc(doc(db, "coupons", pendingCouponId)); showCustomAlert("該商品已順利下架！"); loadBossCouponsMaster(); } catch(e) { showCustomAlert("下架失敗"); } };
+        window.executeCancelPoint = async function() { closeCancelConfirmModal(); try { const nowIso = new Date().toISOString(); await updateDoc(doc(db, "users", pendingCancel.uid, "point_log", pendingCancel.logId), { status: "canceled", canceledAt: nowIso }); const uRef = doc(db, "users", pendingCancel.uid), uSnap = await getDoc(uRef); if (uSnap.exists()) { await updateDoc(uRef, { totalPoints: (uSnap.data().totalPoints || 0) - pendingCancel.pointsValue }); } showCustomAlert("註銷成功"); loadAllCustomers(); } catch (e) { showCustomAlert("註銷失敗"); } };
+        window.executeDeleteMember = async function() { if (document.getElementById('delete-confirm-input').value.trim() !== "del") { showCustomAlert("驗證字串錯誤"); return; } closeDeleteMemberModal(); try { await deleteDoc(doc(db, "users", pendingDeleteUid)); showCustomAlert("會員檔案刪除成功"); loadAllCustomers(); } catch (e) { showCustomAlert("刪除失敗"); } };
+        window.executeSaveRemark = async function() { const uid = window.currentSelectedUserUidForRemark; if (!uid) return; const remark = document.getElementById('remark-name-input').value.trim(); closeRemarkModal(); try { await setDoc(doc(db, "users", uid), { remarkName: remark }, { merge: true }); showCustomAlert("店家備註姓名已更新同步！"); loadAllCustomers(); } catch(e) { showCustomAlert("雲端修改失敗"); } };
 
-        function dataNameSafe(str) { return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+        function showUnpublishCouponModal(cid, name) { pendingCouponId = cid; document.getElementById('unpublish-coupon-msg').innerText = `確定要下架【 ${name} 】嗎？`; document.getElementById('unpublish-coupon-overlay').style.display = "flex"; }
+        function closeUnpublishCouponModal() { document.getElementById('unpublish-coupon-overlay').style.display = "none"; }
+        function openRemarkModalDirect(uid, rawName, currentRemark) { window.currentSelectedUserUidForRemark = String(uid).trim(); document.getElementById('remark-user-title').innerText = `修改 ${rawName} 的店家備註`; document.getElementById('remark-name-input').value = currentRemark || ""; document.getElementById('remark-name-overlay').style.display = "flex"; }
+        function closeRemarkModal() { document.getElementById('remark-name-overlay').style.display = "none"; window.currentSelectedUserUidForRemark = ""; }
+        function showCancelConfirmModal(uid, logId, val) { pendingCancel = { uid, logId, pointsValue: val }; document.getElementById('cancel-confirm-overlay').style.display = "flex"; }
+        function closeCancelConfirmModal() { document.getElementById('cancel-confirm-overlay').style.display = "none"; }
+        function showDeleteMemberModal(uid, name) { pendingDeleteUid = uid; document.getElementById('delete-member-msg').innerText = `確定要永久刪除會員【${name}】嗎？\n此操作不可逆！`; document.getElementById('delete-member-overlay').style.display = "flex"; document.getElementById('delete-confirm-input').value = ""; }
+        function closeDeleteMemberModal() { document.getElementById('delete-member-overlay').style.display = "none"; }
+
+        function switchBossTab(pageId) {
+            document.getElementById('customer-list-page').style.display = "none"; document.getElementById('coupon-list-page').style.display = "none"; document.getElementById('reminder-list-page').style.display = "none"; document.getElementById('coupon-factory-page').style.display = "none";
+            document.getElementById('tab-btn-cust').className = 'boss-tab-btn'; document.getElementById('tab-btn-coup').className = 'boss-tab-btn'; document.getElementById('tab-btn-remind').className = 'boss-tab-btn'; document.getElementById('tab-btn-fac').className = 'boss-tab-btn';
+            if (pageId === 'customer-list-page') { document.getElementById('customer-list-page').style.display = "block"; document.getElementById('tab-btn-cust').className = 'boss-tab-btn tab-active'; loadAllCustomers(); }
+            else if (pageId === 'coupon-list-page') { document.getElementById('coupon-list-page').style.display = "block"; document.getElementById('tab-btn-coup').className = 'boss-tab-btn tab-active'; loadAllCouponsMaster(); }
+            else if (pageId === 'reminder-list-page') { document.getElementById('reminder-list-page').style.display = "block"; document.getElementById('tab-btn-remind').className = 'boss-tab-btn tab-active'; loadExpiryRemindersList(); }
+            else if (pageId === 'coupon-factory-page') { document.getElementById('coupon-factory-page').style.display = "block"; document.getElementById('tab-btn-fac').className = 'boss-tab-btn tab-active'; loadBossCouponsMaster(); }
+        }
     </script>
 
     <style>
@@ -402,7 +402,7 @@
 
     <div id="customer-view" style="display:none;">
         <div class="card">
-            <h1>集點卡</h1>
+            <h1 onclick="handleCustomerTitleClick()" style="cursor: pointer;">集點卡</h1>
             <div id="username" class="user-name">資料讀取中。。。</div>
             <div class="points-section">
                 <p style="margin:0; color:#8a7377; font-size: 14px;">目前可用總點數</p>
@@ -476,7 +476,7 @@
 
     <div id="boss-view" style="display:none; background-color: #fffbfc; padding: 15px 5px;" class="card">
         <div class="boss-title-container">
-            <h2>高階後台系統<span class="version-stamp" style="position:absolute; right:35px; top:12px;">06161600</span></h2>
+            <h2>高階後台系統<span class="version-stamp" style="position:absolute; right:35px; top:12px;">06161615</span></h2>
             <button class="gear-btn" onclick="openPasswordSettingsModal()">🗝️</button>
         </div>
         <div class="boss-nav-tabs">
@@ -531,6 +531,7 @@
         </div>
     </div>
 
+    <!-- 彈窗群 -->
     <div id="shop-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">🌸 點數兌換專區</div><div class="modal-text" style="font-size:12px; margin-bottom:12px; color:#8a7377;">點擊下方商品即可扣點兌換</div><div id="shop-grid" class="shop-grid"></div><button class="modal-btn-cancel" style="width:100%; margin-top:15px;" onclick="closeShopModal()">關閉專區</button></div></div>
     <div id="bag-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">🎀 我的優惠券</div><div id="bag-container" class="bag-list"></div><button class="modal-btn-cancel" style="width:100%; margin-top:15px;" onclick="closeBagModal()">關閉口袋</button></div></div>
     <div id="custom-alert-overlay" class="custom-alert-overlay"><div class="custom-alert-box"><div id="alert-msg" class="custom-alert-text">提示訊息</div><button class="custom-alert-btn" onclick="closeCustomAlert()">確定</button></div></div>
@@ -538,9 +539,9 @@
     <div id="cancel-confirm-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">最高權限操作</div><div id="cancel-confirm-msg" class="modal-text">確定要註銷這筆紀錄嗎？</div><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeCancelConfirmModal()">拒絕</button><button class="modal-btn-confirm" onclick="executeCancelPoint()">確定註銷</button></div></div></div>
     <div id="delete-member-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title" style="color:#d9534f;">🚨 永久刪除會員</div><div id="delete-member-msg" class="modal-text">確認刪除訊息</div><input type="text" id="delete-confirm-input" placeholder="請精準輸入 del" style="margin-top:8px; margin-bottom:5px;"><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeDeleteMemberModal()">取消</button><button class="modal-btn-danger-confirm" onclick="executeDeleteMember()">強行永久刪除</button></div></div></div>
     <div id="unpublish-coupon-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">❌ 下架商品確認</div><div id="unpublish-coupon-msg" class="modal-text"></div><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeUnpublishCouponModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeUnpublishCoupon()">確定下架</button></div></div></div>
-    <div id="remark-name-overlay" class="modal-overlay"><div class="modal-box" style="border: 2px dashed #c97288;"><div id="remark-user-title" class="modal-title">修改店家備註姓名</div><div class="modal-text" style="font-size:12px; color:#8a7377;">此備註僅會顯示在店家後台。</div><input type="text" id="remark-name-input" placeholder="例如：張小姐"><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeRemarkModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeSaveRemark()">儲存修改</button></div></div></div>
-    <div id="exchange-confirm-overlay" class="modal-overlay"><div class="modal-box" style="border: 2px solid #c97288;"><div class="modal-title">💖 兌換商品確認</div><div id="exchange-confirm-msg" class="modal-text" style="font-size:15px; padding:2px 0; font-weight:bold; line-height:1.4; margin-bottom:8px;">確認兌換訊息</div><div id="exchange-confirm-note-box" style="width:100%; box-sizing:border-box; margin-bottom:10px;"></div><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeExchangeConfirmModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeExchangeCoupon()">確定兌換</button></div></div></div>
-    <div id="use-coupon-confirm-overlay" class="modal-overlay"><div class="modal-box" style="border: 2px solid #8a7377;"><div class="modal-title" style="color:#8a7377;">✅ 確認使用優惠券</div><div id="use-coupon-confirm-msg" class="modal-text" style="font-size:14px; font-weight:bold; line-height:1.4;"></div><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeUseCouponConfirmModal()">取消</button><button class="modal-btn-confirm" style="background:#8a7377; color:white;" onclick="executeUseCustomerCoupon()">確定使用</button></div></div></div>
+    <div id="remark-name-overlay" class="modal-overlay"><div class="modal-box" style="border: 2px dashed #c97288;"><div id="remark-user-title" class="modal-title">修改店家備註姓名</div><div class="modal-text" style="font-size:12px; color:#8a7377;">此備註僅會顯示在店家後台。</div><input type="text" id="remark-name-input" placeholder="例如：特約貴賓"><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeRemarkModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeSaveRemark()">儲存修改</button></div></div></div>
+    <div id="exchange-confirm-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">💖 兌換商品確認</div><div id="exchange-confirm-msg" class="modal-text" style="font-size:15px; padding:2px 0; font-weight:bold; line-height:1.4; margin-bottom:8px;">確認兌換訊息</div><div id="exchange-confirm-note-box" style="width:100%; box-sizing:border-box; margin-bottom:10px;"></div><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeExchangeConfirmModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeExchangeCoupon()">確定兌換</button></div></div></div>
+    <div id="use-coupon-confirm-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title" style="color:#8a7377;">✅ 確認使用優惠券</div><div id="use-coupon-confirm-msg" class="modal-text" style="font-size:14px; font-weight:bold; line-height:1.4;"></div><div class="modal-btn-row" style="margin-top:15px;"><button class="modal-btn-cancel" onclick="closeUseCouponConfirmModal()">取消</button><button class="modal-btn-confirm" style="background:#8a7377; color:white;" onclick="executeUseCustomerCoupon()">確定使用</button></div></div></div>
 
 </body>
 </html>
