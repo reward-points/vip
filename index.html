@@ -19,7 +19,7 @@
             projectId: "line-loyalty-card",
             storageBucket: "line-loyalty-card.firebasestorage.app",
             messagingSenderId: "284106917293",
-            appId: "1:284106917293:web:2675c8c6dfe4d4d27e4d24" // ✅ 補齊連線字元
+            appId: "1:284106917293:web:2675c8c6dfe4d4d27e4d24" // 補齊連線字元
         };
         // =========================================================================
 
@@ -144,7 +144,7 @@
                     html += `<li ${rowStyle}><strong style="color:${(isCanceled || isExpired) ? '#aaa' : (isAdd ? '#c97288':'#8a7377')}">${isAdd ? '+':''}${log.pointsObtained} 點</strong><br><small>${log.remark} (${dateInfo})${statusSuffix}</small></li>`;
                 });
                 listEl.innerHTML = html;
-            } catch(e) { listEl.innerHTML = `<li style='color:red;'>資料讀取失敗: ${e.message}</li>`; }
+            } catch(e) { listEl.innerHTML = "<li>資料讀取中。。。</li>"; }
         }
 
         async function loadCustomerCouponHistory(userId) {
@@ -160,7 +160,7 @@
                 } else {
                     renderCouponLogs(qSnapshot, listEl);
                 }
-            } catch(e) { listEl.innerHTML = `<li style='color:red;'>資料讀取失敗: ${e.message}</li>`; }
+            } catch(e) { listEl.innerHTML = "<li>資料讀取中。。。</li>"; }
         }
 
         function renderCouponLogs(snapshot, listEl) {
@@ -219,9 +219,10 @@
             document.getElementById('boss-login-overlay').style.display = "none";
         }
 
-        // 🎯 需求4：高階登入 100% 依賴 Firebase，徹底殺除備用密碼
+        // 🎯 需求4：高階登入 100% 只依賴 Firebase，徹底殺除備用密碼
         async function confirmBossLogin() {
             const bossPass = document.getElementById('boss-pass-input').value;
+            
             try {
                 const configDocRef = doc(db, "system_config", "admin_settings");
                 const configSnap = await getDoc(configDocRef);
@@ -241,7 +242,7 @@
                 }
                 
                 closeBossLoginModal(); 
-                setTimeout(() => { showCustomAlert("密碼錯誤，請重新輸入。"); }, 300); 
+                setTimeout(() => { showCustomAlert("密碼錯誤，請重新登入。"); }, 300); 
             } catch (e) {
                 closeBossLoginModal();
                 setTimeout(() => { showCustomAlert("驗證失敗，請檢查網路連線。"); }, 300);
@@ -278,7 +279,7 @@
             }
         }
 
-        // 🎯 需求3：恢復密碼修改 UI，並寫入 admin_settings，舊密碼失效
+        // 🎯 需求3：恢復密碼修改 UI，並確保寫入 Firebase 後預設密碼即失效
         function openPasswordSettingsModal() {
             document.getElementById('verify-current-boss-pass').value = "";
             document.getElementById('staff-pass-input').value = "";
@@ -296,7 +297,7 @@
             const newBossPass = document.getElementById('new-boss-pass-input').value.trim();
 
             if (!currentVerifyPass) { showCustomAlert("請輸入目前的高階密碼以驗證身份！"); return; }
-            if (!newStaffPass && !newBossPass) { showCustomAlert("您尚未填寫任何想要修改的新密碼！"); return; }
+            if (!newStaffPass && !newBossPass) { showCustomAlert("您尚未填寫任何想要修改的新密碼喔！"); return; }
 
             try {
                 const configDocRef = doc(db, "system_config", "admin_settings");
@@ -947,7 +948,7 @@
             } catch(e) { showCustomAlert("雲端修改失敗，請稍後再試。"); }
         };
 
-        // 🎯 需求4：店家加點密碼管控，完全直連雲端
+        // 🎯 需求4：店員加點登入，徹底拔除備用密碼，100% 依賴 Firebase
         window.confirmSubmit = async function() {
             if (!targetUserId) { showCustomAlert("操作失敗！請先點擊上方「📷 掃描會員」讀取客人的條碼。"); return; }
             const pointsChange = parseInt(document.getElementById('points-input').value);
@@ -963,6 +964,7 @@
                 
                 if (configSnap.exists()) {
                     const cloudStaffPass = configSnap.data().staffPassword;
+                    
                     if (inputPass !== cloudStaffPass || cloudStaffPass === undefined || cloudStaffPass === "") {
                         showCustomAlert("管理密碼錯誤！");
                         submitBtn.disabled = false; submitBtn.innerText = "確定"; 
@@ -1250,10 +1252,12 @@
     </div>
 
     <div id="boss-view" style="display:none; background-color: #fffbfc; padding: 15px 5px;" class="card">
-        <div class="boss-title-container" style="display: flex; justify-content: center; align-items: baseline; position: relative; margin-bottom: 10px;">
-            <h2 style="margin: 0; padding: 0;">高階後台系統</h2>
-            <span class="version-stamp" style="margin-left: 8px; font-size: 10px; color: #d6c0c4;">06171703</span>
-            <button class="gear-btn" onclick="openPasswordSettingsModal()" style="position: absolute; right: 8px; bottom: 0; padding: 0; background: none; border: none; font-size: 16px; cursor: pointer; opacity: 0.85;">🗝️</button>
+        <div class="boss-title-container" style="position: relative; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 5px; margin-bottom: 15px;">
+            <h2 style="margin: 0; line-height: 1;">高階後台系統</h2>
+            <div style="position: absolute; right: 5px; bottom: 0; display: flex; align-items: baseline; gap: 6px;">
+                <span style="font-size: 10px; color: #d6c0c4; letter-spacing: 0.5px;">06171734</span>
+                <button onclick="window.openPasswordSettingsModal()" style="padding: 0; background: none; border: none; font-size: 16px; cursor: pointer; opacity: 0.85;">🗝️</button>
+            </div>
         </div>
         
         <div class="boss-nav-tabs">
@@ -1319,7 +1323,7 @@
     <div id="shop-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">🌸 點數兌換專區</div><div class="modal-text" style="font-size:12px; margin-bottom:12px; color:#8a7377;">點擊下方商品即可扣點兌換</div><div id="shop-grid" class="shop-grid"></div><button class="modal-btn-cancel" style="width:100%; margin-top:15px;" onclick="closeShopModal()">關閉專區</button></div></div>
     <div id="bag-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">🎀 我的優惠券</div><div id="bag-container" class="bag-list"></div><button class="modal-btn-cancel" style="width:100%; margin-top:15px;" onclick="closeBagModal()">關閉口袋</button></div></div>
     <div id="custom-alert-overlay" class="custom-alert-overlay"><div class="custom-alert-box"><div id="alert-msg" class="custom-alert-text">提示訊息</div><button class="custom-alert-btn" onclick="closeCustomAlert()">確定</button></div></div>
-    <div id="boss-login-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">輸入密碼</div><div class="modal-text">請輸入高階管理密碼</div><input type="password" id="boss-pass-input" placeholder="請輸入驗證碼"><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeBossLoginModal()">取消</button><button class="modal-btn-confirm" onclick="confirmBossLogin()">解鎖系統</button></div></div></div>
+    <div id="boss-login-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">輸入密碼</div><div class="modal-text">請輸入最高階管理密碼</div><input type="password" id="boss-pass-input" placeholder="請輸入最高驗證碼"><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeBossLoginModal()">取消</button><button class="modal-btn-confirm" onclick="confirmBossLogin()">解鎖系統</button></div></div></div>
     <div id="cancel-confirm-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">最高權限操作</div><div id="cancel-confirm-msg" class="modal-text">確定要註銷這筆紀錄嗎？</div><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeCancelConfirmModal()">拒絕</button><button class="modal-btn-confirm" onclick="executeCancelPoint()">確定註銷</button></div></div></div>
     <div id="delete-member-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title" style="color: #d9534f;">🚨 永久刪除會員</div><div id="delete-member-msg" class="modal-text">確認刪除訊息</div><input type="text" id="delete-confirm-input" placeholder="請精準輸入 del" style="margin-top:8px; margin-bottom:5px;"><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeDeleteMemberModal()">取消</button><button class="modal-btn-danger-confirm" onclick="executeDeleteMember()">強行永久刪除</button></div></div></div>
     <div id="unpublish-coupon-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">❌ 下架商品確認</div><div id="unpublish-coupon-msg" class="modal-text"></div><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeUnpublishCouponModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeUnpublishCoupon()">確定下架</button></div></div></div>
@@ -1344,8 +1348,8 @@
                 <input type="password" id="new-boss-pass-input" placeholder="留空代表不修改" style="margin-top:4px;">
             </div>
             <div class="modal-btn-row">
-                <button class="modal-btn-cancel" onclick="closePasswordSettingsModal()">取消</button>
-                <button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeSaveNewPasswords()">儲存變更</button>
+                <button class="modal-btn-cancel" onclick="window.closePasswordSettingsModal()">取消</button>
+                <button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="window.executeSaveNewPasswords()">儲存變更</button>
             </div>
         </div>
     </div>
