@@ -19,7 +19,7 @@
             projectId: "line-loyalty-card",
             storageBucket: "line-loyalty-card.firebasestorage.app",
             messagingSenderId: "284106917293",
-            appId: "1:284106917293:web:2675c8c6dfe4d4d27e4d24" // 補齊連線字元
+            appId: "1:284106917293:web:2675c8c6dfe4d4d27e4d24" 
         };
         // =========================================================================
 
@@ -42,7 +42,6 @@
         let pendingExchangeData = {};
         window.currentSelectedUserUidForRemark = "";
 
-        // 🎯 需求1 & 2：自動建立預設密碼邏輯（若無則建，若有則不動作）
         async function autoInitializeCloudPassword() {
             try {
                 const configDocRef = doc(db, "system_config", "admin_settings");
@@ -144,7 +143,7 @@
                     html += `<li ${rowStyle}><strong style="color:${(isCanceled || isExpired) ? '#aaa' : (isAdd ? '#c97288':'#8a7377')}">${isAdd ? '+':''}${log.pointsObtained} 點</strong><br><small>${log.remark} (${dateInfo})${statusSuffix}</small></li>`;
                 });
                 listEl.innerHTML = html;
-            } catch(e) { listEl.innerHTML = "<li>資料讀取中。。。</li>"; }
+            } catch(e) { listEl.innerHTML = `<li style='color:red;'>資料讀取失敗: ${e.message}</li>`; }
         }
 
         async function loadCustomerCouponHistory(userId) {
@@ -160,7 +159,7 @@
                 } else {
                     renderCouponLogs(qSnapshot, listEl);
                 }
-            } catch(e) { listEl.innerHTML = "<li>資料讀取中。。。</li>"; }
+            } catch(e) { listEl.innerHTML = `<li style='color:red;'>資料讀取失敗: ${e.message}</li>`; }
         }
 
         function renderCouponLogs(snapshot, listEl) {
@@ -219,10 +218,8 @@
             document.getElementById('boss-login-overlay').style.display = "none";
         }
 
-        // 🎯 需求4：高階登入 100% 只依賴 Firebase，徹底殺除備用密碼
         async function confirmBossLogin() {
             const bossPass = document.getElementById('boss-pass-input').value;
-            
             try {
                 const configDocRef = doc(db, "system_config", "admin_settings");
                 const configSnap = await getDoc(configDocRef);
@@ -279,7 +276,6 @@
             }
         }
 
-        // 🎯 需求3：恢復密碼修改 UI，並確保寫入 Firebase 後預設密碼即失效
         function openPasswordSettingsModal() {
             document.getElementById('verify-current-boss-pass').value = "";
             document.getElementById('staff-pass-input').value = "";
@@ -352,7 +348,7 @@
                             <button class="bag-use-btn" onclick="showUseCouponConfirmModal('${coupon.id}', '${dataNameSafe(coupon.name)}')">立即使用</button>
                         </div>`;
                 });
-                container.innerHTML = html || "<div style='padding:30px; color:#a18b8f;'>您目前口袋空空。</div>";
+                container.innerHTML = html || "<div style='padding:30px; color:#a18b8f;'>您目前口袋空空，快去專區用點數兌換吧！</div>";
             }).catch(e => { container.innerHTML = "<div style='color:red;'>資料讀取中。。。</div>"; });
         }
         function closeBagModal() { document.getElementById('bag-overlay').style.display = "none"; }
@@ -1164,6 +1160,13 @@
         .modal-btn-cancel { flex: 1; background: #fff; color: #a18b8f; border: 1px solid #fcdce2; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
         .modal-btn-confirm { flex: 1; background: #ffeef0; color: #c97288; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
         .modal-btn-danger-confirm { flex: 1; background: #d9534f; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; }
+        
+        /* 🎯 精準排版設定：拿掉原本的 absolute，改由 HTML 的 flex 進行基準線對齊控制 */
+        .boss-title-container { display: flex; align-items: baseline; max-width: 360px; margin: 0 auto 15px auto; width: 100%; }
+        .gear-btn { background: none; border: none; font-size: 16px; cursor: pointer; transition: transform 0.2s; opacity: 0.85; padding: 0; margin-left: 4px; }
+        .gear-btn:hover { transform: scale(1.1); opacity: 1; }
+        
+        .version-stamp { font-size: 10px; color: #d6c0c4; font-weight: normal; letter-spacing: 0.5px; }
     </style>
 </head>
 <body>
@@ -1252,11 +1255,13 @@
     </div>
 
     <div id="boss-view" style="display:none; background-color: #fffbfc; padding: 15px 5px;" class="card">
-        <div class="boss-title-container" style="position: relative; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 5px; margin-bottom: 15px;">
-            <h2 style="margin: 0; line-height: 1;">高階後台系統</h2>
-            <div style="position: absolute; right: 5px; bottom: 0; display: flex; align-items: baseline; gap: 6px;">
-                <span style="font-size: 10px; color: #d6c0c4; letter-spacing: 0.5px;">06171734</span>
-                <button onclick="window.openPasswordSettingsModal()" style="padding: 0; background: none; border: none; font-size: 16px; cursor: pointer; opacity: 0.85;">🗝️</button>
+        
+        <div class="boss-title-container">
+            <div style="flex: 1;"></div>
+            <h2 style="margin: 0; white-space: nowrap;">高階後台系統</h2>
+            <div style="flex: 1; text-align: right; white-space: nowrap;">
+                <span class="version-stamp">06171811</span>
+                <button class="gear-btn" onclick="window.openPasswordSettingsModal()">🗝️</button>
             </div>
         </div>
         
