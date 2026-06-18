@@ -219,7 +219,6 @@
             document.getElementById('boss-login-overlay').style.display = "none";
         }
 
-        // 🎯 需求4：高階登入 100% 只依賴 Firebase，徹底殺除備用密碼
         async function confirmBossLogin() {
             const bossPass = document.getElementById('boss-pass-input').value;
             
@@ -279,7 +278,6 @@
             }
         }
 
-        // 🎯 需求3：恢復密碼修改 UI，並確保寫入 Firebase 後預設密碼即失效
         function openPasswordSettingsModal() {
             document.getElementById('verify-current-boss-pass').value = "";
             document.getElementById('staff-pass-input').value = "";
@@ -582,6 +580,46 @@
             } catch(e) { showCustomAlert("操作失敗，請重試"); }
         }
 
+        // 🎯 需求：計數器加上 isExpired 過期判斷
+        async function loadAllCouponsMaster() {
+            const listEl = document.getElementById('boss-coupon-list');
+            listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>資料讀取中。。。</div>"; 
+            try {
+                const querySnapshot = await getDocs(collection(db, "users"));
+                let html = "";
+                let nowTime = new Date().getTime(); // 取得現在時間供比對
+                
+                for (const userDoc of querySnapshot.docs) {
+                    const data = userDoc.data();
+                    const uid = userDoc.id;
+                    let displayName = data.lineName || '未命名';
+                    if (data.remarkName) { displayName += ` <span style='color:#c97288; font-size:12px; font-weight:bold;'>(${data.remarkName})</span>`; }
+                    
+                    const walletSnapshot = await getDocs(collection(db, "users", uid, "coupon_wallet"));
+                    let activeCount = 0;
+                    walletSnapshot.forEach(docSnap => { 
+                        const c = docSnap.data();
+                        let isExpired = (c.status === "unused" && c.expiredAt && (nowTime > new Date(c.expiredAt).getTime()));
+                        // 必須是未使用，且還沒過期，才算 1 張
+                        if (c.status === 'unused' && !isExpired) activeCount++; 
+                    });
+
+                    html += `
+                        <div class="customer-item">
+                            <div class="customer-info-row" onclick="toggleCustomerCoupons('${uid}')">
+                                <span>👤 ${displayName}</span>
+                                <span class="badge-points" style="background:#fff3f5; color:#8a7377;">🎀 未使用: ${activeCount} 張</span>
+                            </div>
+                            <div id="coupons-box-${uid}" class="customer-details-box">
+                                <p style="font-size:10px;color:#a18b8f;margin:5px 0;word-break:break-all;">LINE ID: ${uid}</p>
+                                <ul id="coupon-log-list-${uid}" class="boss-log-list"><li>資料讀取中。。。</li></ul> 
+                            </div>
+                        </div>`;
+                }
+                listEl.innerHTML = html || "<p>尚無會員建立優惠券檔案</p>";
+            } catch(e) { listEl.innerHTML = "<p>優惠券總冊載入失敗</p>"; }
+        }
+
         async function loadAllCustomers() {
             const listEl = document.getElementById('boss-customer-list');
             listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>資料讀取中。。。</div>"; 
@@ -662,38 +700,6 @@
                 logListEl.innerHTML = html || "<li>該用戶尚無紀錄</li>";
             } catch (e) { logListEl.innerHTML = "<li>加載失敗</li>"; }
         };
-
-        async function loadAllCouponsMaster() {
-            const listEl = document.getElementById('boss-coupon-list');
-            listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#a18b8f;'>資料讀取中。。。</div>"; 
-            try {
-                const querySnapshot = await getDocs(collection(db, "users"));
-                let html = "";
-                for (const userDoc of querySnapshot.docs) {
-                    const data = userDoc.data();
-                    const uid = userDoc.id;
-                    let displayName = data.lineName || '未命名';
-                    if (data.remarkName) { displayName += ` <span style='color:#c97288; font-size:12px; font-weight:bold;'>(${data.remarkName})</span>`; }
-                    
-                    const walletSnapshot = await getDocs(collection(db, "users", uid, "coupon_wallet"));
-                    let activeCount = 0;
-                    walletSnapshot.forEach(d => { if(d.data().status === 'unused') activeCount++; });
-
-                    html += `
-                        <div class="customer-item">
-                            <div class="customer-info-row" onclick="toggleCustomerCoupons('${uid}')">
-                                <span>👤 ${displayName}</span>
-                                <span class="badge-points" style="background:#fff3f5; color:#8a7377;">🎀 未使用: ${activeCount} 張</span>
-                            </div>
-                            <div id="coupons-box-${uid}" class="customer-details-box">
-                                <p style="font-size:10px;color:#a18b8f;margin:5px 0;word-break:break-all;">LINE ID: ${uid}</p>
-                                <ul id="coupon-log-list-${uid}" class="boss-log-list"><li>資料讀取中。。。</li></ul> 
-                            </div>
-                        </div>`;
-                }
-                listEl.innerHTML = html || "<p>尚無會員建立優惠券檔案</p>";
-            } catch(e) { listEl.innerHTML = "<p>優惠券總冊載入失敗</p>"; }
-        }
 
         window.toggleCustomerCoupons = async function(uid) {
             const box = document.getElementById(`coupons-box-${uid}`);
@@ -915,7 +921,7 @@
         };
         window.closeDeleteMemberModal = function() { document.getElementById('delete-member-overlay').style.display = "none"; };
         
-        // 🎯 需求A：真正的「斬草除根」全清空刪除法
+        // 🎯 A 選項：真正的「斬草除根」全清空刪除法
         window.executeDeleteMember = async function() {
             if (document.getElementById('delete-confirm-input').value.trim() !== "del") { showCustomAlert("驗證字串錯誤"); return; }
             closeDeleteMemberModal();
@@ -1064,7 +1070,7 @@
             }
         };
 
-        function dataNameSafe(str) { return String(str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+        window.dataNameSafe = function(str) { return String(str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
         // =========================================================================
         // 🔒 全域標準通行證掛載區 ➔ 絕對不能省略，否則所有按鈕會失效！
@@ -1118,7 +1124,6 @@
         window.closeRemarkModal = closeRemarkModal;
         window.executeSaveRemark = executeSaveRemark;
         window.confirmSubmit = confirmSubmit;
-        window.dataNameSafe = dataNameSafe;
     </script>
 
     <style>
@@ -1158,7 +1163,7 @@
         .factory-box { background: #fff5f6; padding: 15px; border-radius: 12px; border: 1px dashed #c97288; margin-top: 5px; text-align: left; }
         .history-list { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; font-size: 13px; }
         .history-list li { padding: 8px 0; border-bottom: 1px solid #fff0f2; color: #6e5b5e; text-align: left; }
-        .scan-btn { width: 100%; max-width: 360px; box-sizing: border-box; padding: 15px; background-color: #ffeef0; color: #c97288; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; font-weight: bold; margin: 15px 0; }
+        .scan-btn { width: 100%; max-width: 360px; box-sizing: border-box; padding: 15px; background: #ffeef0; color: #c97288; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; font-weight: bold; margin: 15px 0; }
         .status-box { background: white; border-left: 4px solid #ffeef0; padding: 10px; font-size: 13px; text-align: left; color: #8a7377; }
         .panel { display: block; border-top: 1px dashed #fcdce2; padding-top: 15px; text-align: left; }
         .counter-box { display: flex; align-items: center; }
@@ -1293,7 +1298,7 @@
         
         <div class="boss-title-container">
             <h2 style="margin: 0; line-height: 1;">高階後台系統</h2>
-            <span class="version-stamp">06180111</span>
+            <span class="version-stamp">06180804</span>
             <button class="gear-btn" onclick="openPasswordSettingsModal()">🗝️</button>
         </div>
         
@@ -1360,7 +1365,7 @@
     <div id="shop-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">🌸 點數兌換專區</div><div class="modal-text" style="font-size:12px; margin-bottom:12px; color:#8a7377;">點擊下方商品即可扣點兌換</div><div id="shop-grid" class="shop-grid"></div><button class="modal-btn-cancel" style="width:100%; margin-top:15px;" onclick="closeShopModal()">關閉專區</button></div></div>
     <div id="bag-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">🎀 我的優惠券</div><div id="bag-container" class="bag-list"></div><button class="modal-btn-cancel" style="width:100%; margin-top:15px;" onclick="closeBagModal()">關閉口袋</button></div></div>
     <div id="custom-alert-overlay" class="custom-alert-overlay"><div class="custom-alert-box"><div id="alert-msg" class="custom-alert-text">提示訊息</div><button class="custom-alert-btn" onclick="closeCustomAlert()">確定</button></div></div>
-    <div id="boss-login-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">輸入密碼</div><div class="modal-text">請輸入最高階管理密碼</div><input type="password" id="boss-pass-input" placeholder="請輸入最高驗證碼"><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeBossLoginModal()">取消</button><button class="modal-btn-confirm" onclick="confirmBossLogin()">解鎖系統</button></div></div></div>
+    <div id="boss-login-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">輸入密碼</div><div class="modal-text">請輸入高階管理密碼</div><input type="password" id="boss-pass-input" placeholder="請輸入驗證碼"><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeBossLoginModal()">取消</button><button class="modal-btn-confirm" onclick="confirmBossLogin()">解鎖系統</button></div></div></div>
     <div id="cancel-confirm-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">最高權限操作</div><div id="cancel-confirm-msg" class="modal-text">確定要註銷這筆紀錄嗎？</div><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeCancelConfirmModal()">拒絕</button><button class="modal-btn-confirm" onclick="executeCancelPoint()">確定註銷</button></div></div></div>
     <div id="delete-member-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title" style="color: #d9534f;">🚨 永久刪除會員</div><div id="delete-member-msg" class="modal-text">確認刪除訊息</div><input type="text" id="delete-confirm-input" placeholder="請精準輸入 del" style="margin-top:8px; margin-bottom:5px;"><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeDeleteMemberModal()">取消</button><button class="modal-btn-danger-confirm" onclick="executeDeleteMember()">強行永久刪除</button></div></div></div>
     <div id="unpublish-coupon-overlay" class="modal-overlay"><div class="modal-box"><div class="modal-title">❌ 下架商品確認</div><div id="unpublish-coupon-msg" class="modal-text"></div><div class="modal-btn-row"><button class="modal-btn-cancel" onclick="closeUnpublishCouponModal()">取消</button><button class="modal-btn-confirm" style="background:#c97288; color:white;" onclick="executeUnpublishCoupon()">確定下架</button></div></div></div>
